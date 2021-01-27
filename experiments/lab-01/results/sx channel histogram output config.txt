@@ -1,0 +1,4 @@
+plot "sx.jpg red.dat" with boxes fillstyle transparent solid 0.5 fillcolor "red", "sx.jpg green.dat" with boxes fillstyle transparent pattern 6 fillcolor "green", "sx.jpg blue.dat" with boxes fillstyle transparent pattern 0 fillcolor "blue"
+
+
+set title "histograms of sx.jpg channels"

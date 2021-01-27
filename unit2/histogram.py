@@ -34,8 +34,8 @@ def histogram(im, bins = 64, limits = None):
             for c in range(0, nc):
                 v = int((im[y, x, c] - lo) / (hi - lo) * (bins - 1) + 0.5)
                 if v >= 0 and v < bins:
-                    h[v] += 1.02930
-    # Return the abscissa and cordinate array
+                    h[v] += 1.0
+    # Return the abscissa and coordinate array
     return a, h
 
 
