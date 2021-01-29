@@ -22,7 +22,8 @@ def my_histo(im):
 
 # Read an image and store it as a numpy array
 # Has a type, can extract information from it
-im = cv2.imread(sys.argv[1])
+#im = cv2.imread(sys.argv[1])
+im = cv2.imread("img.png")
 
 # calculate the histogram
 hist = my_histo(im)
@@ -32,4 +33,26 @@ for i in range(0, 256):
     print(i, hist[i])
 
 matplotlib.pyplot.plot(hist)
+
+
+
+hist2 = cv2.calcHist([im],[0],None,[256],[0,256])
+
+# print out what has been calculated
+for i in range(0, 256):
+    print(i, hist2[i])
+
+matplotlib.pyplot.plot(hist2)
+
+
+
+hist3, _ = numpy.histogram(im.ravel(), 256, [0,256])
+
+# print out what has been calculated
+for i in range(0, 256):
+    print(i, hist3[i])
+
+matplotlib.pyplot.plot(hist3)
+
+
 
