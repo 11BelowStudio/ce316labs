@@ -27,26 +27,18 @@ def histogram (im):
     lab-01's summarize program."""
     MAXGREY = 256
 
-    # We shall fill the array hist with the histogram.
-    hist = numpy.zeros (MAXGREY)
 
-    # Get the image sizes.
-    sizes = im.shape
-    if len (sizes) == 2:
-        # it's monochrome
-        ny = sizes (0)
-        nx = sizes (1)
-        nc = 1
-    else:
-        # it has several channels
-        ny, nx, nc = sizes
+    imRed = im[:,:,2]
+    imGreen = im[:,:,1]
+    imBlue = im[:,:,0]
 
-    # Work through the image, accumulating the histogram.
-    for y in range (0, ny):
-        for x in range (0, nx):
-            for c in range (0, nc):
-                v = int (im[y,x,c])
-                hist[v] += 1
+    redHist = cv2.calcHist([imRed],[0],None,[256],[0,256])
+    greenHist = cv2.calcHist([imGreen],[0],None,[256],[0,256])
+    blueHist = cv2.calcHist([imBlue],[0],None,[256],[0,256])
+
+    hist = numpy.vstack((redHist,greenHist,blueHist))
+
+    assert len(hist) == 256 * 3
 
     # Return the histogram we have computed.
     return hist
@@ -70,13 +62,15 @@ probe = histogram (im)
 for file in sys.argv[2:]:
     if file != probe_file:
         im = cv2.imread (file)
+
         h = histogram (im)
+
         v = compare (probe, h)
         if v > v_best:
             v_best = v
             f_best = file
 
-        break
+        #break
 
 # We've finished our work, so say which of the test set best matches the
 # probe and exit.

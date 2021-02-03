@@ -27,26 +27,43 @@ def histogram (im):
     lab-01's summarize program."""
     MAXGREY = 256
 
-    # We shall fill the array hist with the histogram.
-    hist = numpy.zeros (MAXGREY)
+    # https://stackoverflow.com/questions/58465783/how-to-set-background-color-on-image-to-white-with-opencv-in-python/58466505#58466505
 
-    # Get the image sizes.
-    sizes = im.shape
-    if len (sizes) == 2:
-        # it's monochrome
-        ny = sizes (0)
-        nx = sizes (1)
-        nc = 1
-    else:
-        # it has several channels
-        ny, nx, nc = sizes
+    HSV_MIN = numpy.array([
+        im[0, 0, 0],
+        im[0, 0, 1],
+        im[0, 0, 2]
+    ], numpy.uint8)
+    HSV_MAX = numpy.array([179, 255, 255], numpy.uint8)
 
-    # Work through the image, accumulating the histogram.
-    for y in range (0, ny):
-        for x in range (0, nx):
-            for c in range (0, nc):
-                v = int (im[y,x,c])
-                hist[v] += 1
+    hsvRaw = cv2.cvtColor(im, cv2.COLOR_BGR2HSV)
+
+    mask = cv2.inRange(hsvRaw, HSV_MIN, HSV_MAX)
+    #reverseMask = 255 - mask
+
+    blackBG = cv2.bitwise_and(im,im, mask = mask)
+
+
+
+    maskedIm = blackBG
+
+
+    #cv2.imshow("white bg",maskedIm)
+    #cv2.waitKey(0)
+
+    hsv = cv2.cvtColor(maskedIm, cv2.COLOR_BGR2HSV)
+    h, s, v = cv2.split(hsv)
+
+    hHist = cv2.calcHist([h], [0], None, [256], [0,256])
+    sHist = cv2.calcHist([s], [0], None, [256], [0,256])
+    vHist = cv2.calcHist([v], [0], None, [256], [0,256])
+
+    hist = numpy.vstack((hHist, sHist, vHist))
+
+    assert len(hist) == 256 * 3
+
+    #print(hist)
+
 
     # Return the histogram we have computed.
     return hist
@@ -64,19 +81,24 @@ f_best = "?"
 im = cv2.imread (probe_file)
 probe = histogram (im)
 
+
 # We now enter the main loop.  The basic idea is to load an image, find its
 # histogram, then compare that with the histogram of the probe image.  We are
 # careful to skip the case when the test image is the same as the probe.
+
 for file in sys.argv[2:]:
     if file != probe_file:
         im = cv2.imread (file)
+
         h = histogram (im)
+
         v = compare (probe, h)
         if v > v_best:
             v_best = v
             f_best = file
 
-        break
+        #break
+
 
 # We've finished our work, so say which of the test set best matches the
 # probe and exit.
