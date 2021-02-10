@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+"contours -- demo of OpenCV's contour-processing capabilities"
+import sys, cv2
+
+# Handle the command line.
+if len (sys.argv) < 3:
+    print ("Usage:", sys.argv[0], "<image> <threshold>", file=sys.stderr)
+    sys.exit (1)
+img = cv2.imread (sys.argv[1])
+t = int (sys.argv[2])
+
+# Produce a binary image.
+gray = cv2.cvtColor (img, cv2.COLOR_BGR2GRAY)
+blur = cv2.GaussianBlur (gray, (5, 5), 0)
+
+"""
+threshold parameters:
+  src: input greyscale image
+  maxVal: value to be given if pixel value is more than threshold
+  thresholdingTechnique: what way it's being thresholded.
+     cv2.THRESH_BINARY
+        if pixel value >= threshold, set to 255
+            else set to 0
+     cv2.THRESH_BINARY_INV
+        opposite of THRESH_BINARY
+     cv2.THRESH_TRUNC
+        if pixel value >= threshold, set to threshold
+     cv2.THRESH_TOZERO
+        if pixel value < threshold, set to 0
+     cv2.THRESH_TOZERO_INV
+        opposite of THRESH_TOZERO
+     + cv2.THRESH_OTSU
+        You're now using Otsu Thresholding.
+  1st return value: given threshold value
+  2nd return value: modified image array
+"""
+t, binary = cv2.threshold (blur, t, 255, cv2.THRESH_BINARY)
+print(t)
+
+"""
+adaptive threshold parameters
+    src: input image
+    maxVal: maximum value that can be assigned to a pixel
+    adaptiveMethod: how to calculate threshold
+        cv2.ADAPTIVE_THRESH_MEAN_C
+            Threshold Value = (Mean of the neighbourhood area values – constant value)
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C
+            Threshold Value = (Gaussian-weighted sum of the neighbourhood values – constant value)
+    thresholdType: type of thresholding to be applied
+    blockSize: size of pixel neighbourhood used to calculate a threshold value
+    constant: constant value subtracted from mean/weighted sum of neighbourhood pixels
+"""
+#binary = cv2.adaptiveThreshold(blur,255, cv2.ADAPTIVE_THRESH_MEAN_C,
+#                               cv2.THRESH_BINARY, 315, 10)
+
+#thresh, binary = cv2.threshold(blur, 0, 255,
+#                               cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+#print(thresh)
+cv2.namedWindow (sys.argv[0], cv2.WINDOW_NORMAL)
+ny, nx, nc = img.shape
+cv2.resizeWindow (sys.argv[0], nx//2, ny//2)
+cv2.imshow(sys.argv[0], binary)
+cv2.waitKey(0)
+
+# Find contours.
+"""
+arguments
+    source image
+        binary
+        objects to find: white
+        background: black
+    2nd argument; what contours are to be found
+        cv2.RETR_EXTERNAL
+            outermost edges
+        cv2.RETR_TREE
+            heirarchy.
+                outermost contours at top
+                moving down; inner contours
+        cv2.CCOMP
+    3rd: whether or not to simplify the contours
+        cv2.CHAIN_APPROX_SIMPLE
+            Simplify with line segments when possible
+returns
+    1st
+        list of numpy arrays, each holding points for one contour
+    2nd
+        numpy array for contour hierarchy
+        1 row, n columns (one for each contour), depth of 4
+            depth contains indices for other contours
+            [next, previous, firstChild, parent]
+                next: next in this level
+                previous: previous in this level
+                firstChild: first child contour
+                parent: the contour containing this contour
+                -1 indicates no such contour exists
+"""
+#contours, _ = cv2.findContours (binary, cv2.RETR_EXTERNAL,
+#    cv2.CHAIN_APPROX_SIMPLE)
+# Print a table of the contours and their sizes.
+#print ("Found %d objects." % len(contours))
+#for (i, c) in enumerate(contours):
+#    print ("\tSize of contour %d: %d" % (i, len(c)))
+
+(contours, heirarchy) = cv2.findContours(binary, cv2.RETR_TREE,
+                                         cv2.CHAIN_APPROX_SIMPLE)
+# Count the number of dots on the dice faces.
+# We do this by iterating over
+# hierarchy[0], first to find the indices of the dice contours, then again
+# to find the dot contours.
+dice = [] # list of dice contours
+dots = [] # list of dot contours
+innerBits = [] # list of the bits of lost paint
+
+# find dice contours
+for (i, c) in enumerate(heirarchy[0]):
+    if c[3] == -1:
+        dice.append(i)
+
+# Now find the dots
+for (i, c) in enumerate (heirarchy[0]):
+    if c[3] in dice:
+        dots.append(i)
+print("Total number of dots: ", len(dots))
+
+for (i, c) in enumerate(heirarchy[0]):
+    if c[3] in dots:
+        innerBits.append(i)
+
+red = (0, 0, 255)
+green = (0, 255, 0)
+blue = (255, 0, 0)
+
+for i in dice:
+    cv2.drawContours(img, contours[i], -1, red, 5)
+for i in dots:
+    cv2.drawContours(img, contours[i], -1, green, 5)
+for i in innerBits:
+    cv2.drawContours(img, contours[i], -1, blue, 5)
+
+# Draw contours over original image and display the result.
+
+#cv2.drawContours (img, contours, -1, (0, 0, 255), 5)
+cv2.namedWindow (sys.argv[0], cv2.WINDOW_NORMAL)
+ny, nx, nc = img.shape
+cv2.resizeWindow (sys.argv[0], nx//2, ny//2)
+cv2.imshow (sys.argv[0], img)
+cv2.waitKey (0)
