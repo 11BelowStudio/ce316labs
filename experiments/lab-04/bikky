@@ -19,7 +19,16 @@ You have two jobs to do:
     write that into the image.
 """
 
-import sys, numpy, cv2
+import sys, numpy, cv2, math
+
+
+def handleShowingStuff():
+    key = cv2.waitKey(0)
+    # quit if escape (27) or q (113) are pressed
+    if key == 27 or key == 113:
+        cv2.destroyAllWindows()
+        print("quitting!")
+        sys.exit(0)
 
 # Set up the threshold.
 threshold = 100
@@ -35,18 +44,148 @@ if len (sys.argv) < 2:
     print ("Usage: %s <biscuit-image>..." % sys.argv[0], file=sys.stderr)
     exit (1)
 
+if sys.argv[1] == "k":
+    sys.argv = sys.argv[:1]
+    for i in range(1,10):
+        temp = "biscuit-00" + str(i) + ".jpg"
+        sys.argv.append(temp)
+        temp = "biscuit-05" + str(i) + ".jpg"
+        sys.argv.append(temp)
+        temp = "biscuit-07" + str(i) + ".jpg"
+        sys.argv.append(temp)
+        temp = "biscuit-20" + str(i) + ".jpg"
+        sys.argv.append(temp)
+
 # Iterate over the image names given on the command line.
 for fn in sys.argv[1:]:
     # Read in the image as monochrome and binarize it by thresholding.
     print (fn + ":")
     im = cv2.imread (fn, cv2.IMREAD_GRAYSCALE)
-    ret, bim = cv2.threshold (im, threshold, 255, cv2.THRESH_BINARY)
+    #cv2.imshow("raw", im)
+
+    blur = cv2.GaussianBlur(im, (5, 5), 0)
+
+    #handleShowingStuff()
+    #ret, bim = cv2.threshold (im, threshold, 255, cv2.THRESH_BINARY)
+    #ret, bim = cv2.threshold(im, threshold, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+
+    #blur = cv2.GaussianBlur(im, (7,7), 0)
+    #cv2.imshow("blurred", blur)
+    #cv2.waitKey(0)
+
+    #cv2.imshow("blurred", blur)
+    #handleShowingStuff()
+    ret, bim1 = cv2.threshold(blur, threshold, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    print(ret)
+    canny = cv2.Canny(blur, ret, ret)
+    #cv2.imshow("canny", canny)
+    #handleShowingStuff()
+    #cv2.imshow("bim1", bim1)
+    #handleShowingStuff()
+    bim2 = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+                                 cv2.THRESH_BINARY_INV, 15, 11)
+
+    #cv2.imshow("bim2", bim2)
+    # cv2.waitKey(0)
+    #handleShowingStuff()
+    kernel = numpy.ones((3, 3), numpy.uint8)
+    bim2e = cv2.morphologyEx(bim2, cv2.MORPH_CLOSE, kernel)#, iterations= 5) #cv2.dilate(bim2, kernel)
+    #cv2.imshow("dilated bim2", bim2e)
+    #handleShowingStuff()
+    bim2g = cv2.morphologyEx(bim2e, cv2.MORPH_GRADIENT, kernel)# iterations=5)
+    #cv2.imshow("gradient bim2e", bim2g)
+    #handleShowingStuff()
+
+    #bima = cv2.subtract(bim1, bim2g)
+    #cv2.imshow("bima", bima)
+    bima = cv2.subtract(bim1, canny)
+    bim = cv2.morphologyEx(bima, cv2.MORPH_CLOSE, kernel)# numpy.ones((3, 3), numpy.uint8))
+    #cv2.imshow("bim", bim)
+    #handleShowingStuff()
+    bim = cv2.morphologyEx(bim, cv2.MORPH_CLOSE, numpy.ones((9, 9), numpy.uint8))
+    #cv2.imshow("bim more", bim)
+    #handleShowingStuff()
+
+    """
+    bim1_floodfill = bim1.copy()
+    h, w = bim1.shape[:2]
+    mask = numpy.zeros((h+2,w+2), numpy.uint8)
+    cv2.floodFill(bim1_floodfill, mask, (0,0), 255)
+    bim1_ff_inv = cv2.bitwise_not(bim1_floodfill)
+
+    bim1_out = bim1_floodfill | bim1_ff_inv
+
+    cv2.imshow("floodfill", bim1_floodfill)
+    cv2.imshow("not floodfill", bim1_ff_inv)
+    cv2.imshow("Foreground", bim1_out)
+    handleShowingStuff()
+    cv2.destroyAllWindows()
+    """
+    """"
+    bim2 = cv2.adaptiveThreshold(blur, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
+                                   cv2.THRESH_BINARY, 15, 11)
+
+    cv2.imshow("bim2", bim2)
+    #cv2.waitKey(0)
+    handleShowingStuff()
+
+    bim12 = cv2.add(bim1, bim2)
+    cv2.imshow("bim1+bim2", bim12)
+    notbim12 = cv2.bitwise_not(bim12)
+    cv2.imshow("not bim1+bim2", notbim12)
+
+    bimA = cv2.subtract(bim1, bim2, mask = bim1)
+    cv2.imshow("bimA", bimA)
+
+
+    #bim2flood = cv2.floodFill(bim2, notbim12, (0,0), 255)
+    #cv2.imshow("bim2flood", bim2flood)
+    #bimA = cv2.bitwise_not(bimA)
+    #bimA = cv2.add(bim1, bim2, mask = bim1)
+    #cv2.imshow("not bimA", bimA)
+    #cv2.waitKey(0)
+    handleShowingStuff()
+
+    bimB = cv2.subtract(bim2, bim1)#, mask=bim2)
+    #bimB = cv2.add(bim2, bim1, mask = bim2)
+    cv2.imshow("bimB", bimB)
+    bim2minusB = cv2.subtract(bim2, bimB)
+    cv2.imshow("bim2 - bimB", bim2minusB)
+    bim2mBpB = cv2.add(bim2minusB, bimB)
+    cv2.imshow("bimB + (bim2-bimB)", bim2mBpB )
+    handleShowingStuff()
+
+    element = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (23, 23), (11,11))
+    dilated_bim2minusB = cv2.dilate(bim2minusB, element)
+    cv2.imshow("Dilated bim2-bimB", dilated_bim2minusB)
+    blur2mB = cv2.blur(bim2minusB,(7,7),0)
+
+    cv2.imshow("blurred bim2-bimb", blur2mB)
+
+    bim = cv2.add(bim1, bimA)
+    cv2.imshow("bimB + bimA", bim)
+    #bim = dilated_bim2minusB
+    #bim = cv2.add(bim1, bimA)
+    cv2.imshow("~~bimB + bimA~~ bim", bim)
+    bim = cv2.bitwise_not(bim)
+    cv2.imshow("not bim", bim)
+    #bim = cv2.GaussianBlur(bimA, (11, 11), 0)
+    #cv2.imshow("blurred bimA", bim)
+    cv2.waitKey(0)
+    handleShowingStuff()
+    """
 
     # Tidy up the binary image by deleting small regions and filling in gaps.
     kernel = numpy.ones ((9, 9), numpy.uint8)
     bim = cv2.morphologyEx (bim, cv2.MORPH_OPEN, kernel)
+    #cv2.imshow("bim open", bim)
+    #handleShowingStuff()
     bim = cv2.morphologyEx (bim, cv2.MORPH_CLOSE, kernel)
-
+    #cv2.imshow("bim close", bim)
+    #handleShowingStuff()
+    bim = cv2.GaussianBlur(bim, (3,3),0)
+    #cv2.imshow("bim blur", bim)
+    #handleShowingStuff()
     # Find contours and print them out.
     contours, _ = cv2.findContours (bim, cv2.RETR_EXTERNAL,
                                     cv2.CHAIN_APPROX_SIMPLE)
@@ -60,6 +199,50 @@ for fn in sys.argv[1:]:
     # the variable "outcome".
     outcome = "biscuit"
 
+    if len(contours) == 0:
+        outcome = "no biscuit"
+    elif len(contours) > 1:
+        outcome = "broken"
+    else:
+        cnt = contours[0]
+
+        m = cv2.moments(cnt)
+        #print(m)
+
+        cx = int(m['m10']/m['m00'])
+        cy = int(m['m01']/m['m00'])
+        center = (cx, cy)
+
+        area = m['m00'] #area from the moments
+
+        perimeter = cv2.arcLength(cnt, True)
+
+        #isConvex = cv2.isContourConvex(cnt)
+        minRectangle = cv2.minAreaRect(cnt)
+        boxRect = cv2.boxPoints(minRectangle)
+        boxRect = numpy.int0(boxRect)
+        boxMoment = cv2.moments(boxRect)
+        rectangularity = area / boxMoment["m00"]
+        #rectangleyness = cv2.matchShapes(cnt, boxRect, cv2.CONTOURS_MATCH_I3, 1)
+        #print(rectangleyness)
+        _, radius = cv2.minEnclosingCircle(cnt)
+        radius = int(radius)
+        #area = cv2.contourArea(cnt)
+        circularity = (4 * math.pi * area) / (perimeter * perimeter)
+        print(circularity)
+        print(rectangularity)
+        if (circularity < 0.75) and (rectangularity < 0.75):
+            outcome = "Broken"
+        elif circularity > rectangularity:
+            outcome = "circle"
+            cv2.circle(im, center, radius, (0, 255, 0), 2)
+        else:
+            outcome = "rectangle"
+            cv2.drawContours(im, [boxRect], 0, (0, 0, 255), 2)
+        #cv2.circle(im, center, int(radius), (0, 255, 0),2)
+
+    print(outcome)
+
     # Write the outcome on the image.  The third argument is the (y,x) location
     # of where to write it.
     cv2.putText (im, outcome, (10, 45), font, 1, 0, 2, cv2.LINE_AA)
@@ -67,5 +250,10 @@ for fn in sys.argv[1:]:
     # Draw the contours on the image and display the result.
     cv2.drawContours (im, contours, -1, 0, 2)
     cv2.imshow (fn, im)
-    cv2.waitKey (0)
+    handleShowingStuff()
+    #key = cv2.waitKey (0)
+    cv2.destroyAllWindows()
+    #if key == 27:
+        #break
 cv2.destroyAllWindows ()
+

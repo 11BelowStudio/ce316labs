@@ -11,7 +11,15 @@ t = int (sys.argv[2])
 
 # Produce a binary image.
 gray = cv2.cvtColor (img, cv2.COLOR_BGR2GRAY)
-blur = cv2.GaussianBlur (gray, (5, 5), 0)
+#blur = cv2.GaussianBlur (gray, (5, 5), 0)
+blur = cv2.GaussianBlur(gray, (49, 49), 0)
+#blur = cv2.GaussianBlur(gray, (25, 25), 0)
+cv2.namedWindow (sys.argv[0], cv2.WINDOW_NORMAL)
+ny, nx, nc = img.shape
+cv2.resizeWindow (sys.argv[0], nx//2, ny//2)
+cv2.imshow(sys.argv[0], blur)
+cv2.waitKey(0)
+# ideal threshold: 175.
 
 """
 threshold parameters:
@@ -34,8 +42,8 @@ threshold parameters:
   1st return value: given threshold value
   2nd return value: modified image array
 """
-t, binary = cv2.threshold (blur, t, 255, cv2.THRESH_BINARY)
-print(t)
+#t, binary = cv2.threshold (blur, t, 255, cv2.THRESH_BINARY)
+#print(t)
 
 """
 adaptive threshold parameters
@@ -50,17 +58,27 @@ adaptive threshold parameters
     blockSize: size of pixel neighbourhood used to calculate a threshold value
     constant: constant value subtracted from mean/weighted sum of neighbourhood pixels
 """
-#binary = cv2.adaptiveThreshold(blur,255, cv2.ADAPTIVE_THRESH_MEAN_C,
-#                               cv2.THRESH_BINARY, 315, 10)
+#binary = cv2.adaptiveThreshold(blur,255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+#                               cv2.THRESH_BINARY, 25, 12)
 
-#thresh, binary = cv2.threshold(blur, 0, 255,
-#                               cv2.THRESH_BINARY + cv2.THRESH_OTSU)
-#print(thresh)
+#blur = cv2.GaussianBlur(gray, (49, 49), 0)
+thresh, binary = cv2.threshold(blur, 0, 255,
+                               cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+print(thresh)
+
+
 cv2.namedWindow (sys.argv[0], cv2.WINDOW_NORMAL)
 ny, nx, nc = img.shape
 cv2.resizeWindow (sys.argv[0], nx//2, ny//2)
 cv2.imshow(sys.argv[0], binary)
 cv2.waitKey(0)
+
+edged = cv2.Canny(img, thresh, thresh, L2gradient=True)
+cv2.namedWindow ("canny", cv2.WINDOW_NORMAL)
+cv2.resizeWindow ("canny", nx//2, ny//2)
+cv2.imshow("canny", edged)
+cv2.waitKey(0)
+
 
 # Find contours.
 """
