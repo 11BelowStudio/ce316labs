@@ -12,11 +12,25 @@ contouring = "tree"
 
 # Handle the command line.
 if len (sys.argv) < 3:
-    print ("Usage:", sys.argv[0], "<image> <threshold>", file=sys.stderr)
+    print ("Usage:", sys.argv[0], "<image> <threshold> <thresholdingType> <contourType>", file=sys.stderr)
     sys.exit (1)
 im = cv2.imread (sys.argv[1])
 t = int (sys.argv[2])
-
+if len (sys.argv) > 2:
+    tmethInt = int(sys.argv[3])
+    if tmethInt == 0:
+        thresholding = "vanilla"
+    elif tmethInt == 1:
+        thresholding = "adaptive"
+    else:
+        thresholding = "otsu"
+    if len (sys.argv) > 3:
+        if int(sys.argv[4]) == 0:
+            contouring = "vanilla"
+        else:
+            contouring = "tree"
+print(thresholding)
+print(contouring)
 # Convert to greyscale and reduce noise a little.
 grey = cv2.cvtColor (im, cv2.COLOR_BGR2GRAY)
 blur = cv2.GaussianBlur (grey, (5, 5), 0)
