@@ -12,7 +12,11 @@ contouring = "tree"
 
 # Handle the command line.
 if len (sys.argv) < 3:
-    print ("Usage:", sys.argv[0], "<image> <threshold> <thresholdingType> <contourType>", file=sys.stderr)
+    print ("Usage:", sys.argv[0], "<image>",
+           " <threshold>",
+           " <thresholdingType>",
+           " <contourType>"
+           , file=sys.stderr)
     sys.exit (1)
 im = cv2.imread (sys.argv[1])
 t = int (sys.argv[2])
