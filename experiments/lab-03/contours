@@ -24,6 +24,7 @@ cv2.waitKey(0)
 """
 threshold parameters:
   src: input greyscale image
+  threshold: the pixel value that is being used as a threshold
   maxVal: value to be given if pixel value is more than threshold
   thresholdingTechnique: what way it's being thresholded.
      cv2.THRESH_BINARY

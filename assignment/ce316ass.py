@@ -19,6 +19,19 @@ for frame in range (0, nframes):
     im_right = cv2.imread(fn_right)
     print(fn_left)
     print(fn_right)
+
+    cv2.imshow("left", im_left)
+    cv2.waitKey(0)
+
+
+    leftGreyscale = cv2.cvtColor(im_left, cv2.COLOR_BGR2GRAY)
+
+    leftMask = cv2.threshold(leftGreyscale, 0, 255, cv2.THRESH_BINARY)
+
+    cv2.imshow("left greyscale", leftGreyscale)
+    cv2.imshow("left mask", leftMask)
+    cv2.waitKey(0)
+
     # TODO
     # we know background is exactly black
     # each object is a different colour
