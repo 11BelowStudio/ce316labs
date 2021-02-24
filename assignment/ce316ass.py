@@ -13,6 +13,11 @@ cam info:
     focal length: 12m
     dist (baseline): 3500m
     pixel spacing: 10 microns = 1*10e-5m =  0.00001m
+        scale in radians: ps/focal
+            1/1200000 = (8.33r*10e-7)
+            radians -> arc = (180/pi) * 3600
+            0.1718873385 micron scale
+        scale in m: 1.718873385*10e-7
     680 * 480 img
     
 depth = f m b/disparity
