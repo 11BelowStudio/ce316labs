@@ -4,7 +4,7 @@ import numpy as np
 import scipy as sp
 from scipy import ndimage as si
 import typing
-from typing import Tuple, List, Dict
+from typing import Tuple, List, Dict, Union
 from math import sqrt
 
 """
@@ -26,7 +26,6 @@ depth = f m b/disparity
 f[12m] = sqrt(640^2 + 480^2)/
 """
 
-
 """
 --TESTING FUNCTIONS FOR TESTING THINGS OUT--
 
@@ -35,7 +34,6 @@ No?
 
 Either way, here are some functions that can be used for testing.
 """
-
 
 testing: bool = False
 """
@@ -50,6 +48,7 @@ def getObjectMasks(hsvIn: np.ndarray) -> Tuple[np.ndarray, np.ndarray,
                                                np.ndarray]:
     """
     Generates the object masks for a given HSV image.
+
     :param hsvIn: the hsv image that contains the objects
     :return: masks for each of the 7 coloured objects that are in it.
     (cyan, red, white, blue, green, yellow, orange)
@@ -71,11 +70,11 @@ def getObjectMasks(hsvIn: np.ndarray) -> Tuple[np.ndarray, np.ndarray,
             green_mask, yellow_mask, orange_mask)
 
 
-
 def getStereoMasks(left_in: np.ndarray, right_in: np.ndarray) -> \
         List[Tuple[np.ndarray, np.ndarray]]:
     """
     Generates a list of masks for the left and right stereo images
+
     :param left_in: the left image.
     :param right_in: the right image.
     :return: a list of tuples containing the masks for each of the images.
@@ -101,6 +100,7 @@ def showAllMasksForTesting(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
     of the object, as well as what number frame this is.
     Apologies in advance if the annotations overlap with the position of
     one of the objects in the set of images you are using to mark this.
+
     :param i_left: left image (BGR format)
     :param i_right: right image (BGR format)
     :param f: frame number
@@ -133,13 +133,13 @@ def showAllMasksForTesting(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
         i += 1
 
 
-
 def handleShowingStuff() -> None:
     """
     This is here to handle actually showing stuff when testing the program.
     Prints something to console to let me know that I need to press something,
     handles doing the cv2.waitKey(0) call,
     and, if I press q or escape, it will close the program.
+
     :return: nothing is returned.
     """
     print("pls to press")
@@ -149,6 +149,7 @@ def handleShowingStuff() -> None:
         cv2.destroyAllWindows()
         print("quitting!")
         sys.exit(0)
+
 
 """
 -- THE ACTUALLY IMPORTANT CODE THAT ACTUALLY DOES STUFF --
@@ -201,10 +202,10 @@ A 3*3 numpy array of 1s, to be used when closing up holes in some of the masks
 def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
     """
     Returns the midpoint of the region of 1s in the given binary image array
+
     :param objectMask: binary image, with 1s in the area where the object
-    with the midpoint being looked for is, and 0s everywhere else.
-    :return: A tuple containing:
-        * Tuple with the midpoint of the object (in middle of middle pixel)
+     with the midpoint being looked for is, and 0s everywhere else.
+    :return: A tuple holding the the midpoint of the object (-1,-1 if no object)
     """
     if not objectMask.any():
         # if nothing in the objectMask is a 1, we return -1s.
@@ -260,6 +261,7 @@ def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
 def getObjectMidpoints(hsvIn: np.ndarray) -> Dict[str, Tuple[float, float]]:
     """
     Gets the midpoints for the objects that may be in the coloured image.
+
     :param hsvIn: the hsv image that contains the objects
     :return: dict with midpoints for each of the 7 coloured objects
     that might be present in the given image.
@@ -311,16 +313,17 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
     Gets the positions of objects in the left and right *coloured* images.
     This **will** assume that the dimensions of the left and right images
     are identical, and that the two images are Y-aligned already.
+
     :param left_in: the left input image *in colour*
     :param right_in: the right input image *in colour*
     :return: a dictionary with the x and y positions of each of the objects
-    in each image.
+     in each image.
 
-    1st item in the tuple: (xl,y') from left image.
-    2nd item in the tuple: (xr,y') from right image.
+        1st item in the tuple: (xl,y') from left image.
+        2nd item in the tuple: (xr,y') from right image.
 
-    If an object is not present in **both** images, it will **not** be present
-    in the returned dictionary.
+        If an object is not present in **both** images, it will **not** be
+        present in the returned dictionary.
     :raises: ValueError if the two images provided have different dimensions.
     """
     # gets the shape of the images
@@ -391,6 +394,7 @@ class FramePosData:
     def __init__(self, frameNumber: int, left: np.ndarray, right: np.ndarray):
         """
         Constructor for the framePosData stuff
+
         :param frameNumber: what frame this is
         :param left: the left image in BGR colour
         :param right: the right image in BGR colour
@@ -480,6 +484,7 @@ class FramePosData:
         Prints the frame number, object name, and distance of the object from
         the origin for all the objects encountered, formatted following the
         assignment brief. Promptly followed by the raw pos of the object.
+
         :return: nothing.
         """
         keys: List[str] = [*self.distances.keys()]
@@ -492,12 +497,53 @@ class FramePosData:
                 self.posXYZ[k]
             ))
 
+
+def checkIfImageWasOpened(filename: str, img: Union[np.ndarray, None]) -> None:
+    """
+    This will check if the image with the given filename could be opened
+
+    :param filename: the name of the file
+    :param img: the numpy.ndarray (or lack thereof) that opencv could open
+     using that given filename
+    :return: nothing. But, if the file couldn't be opened (causing img to be
+     None instead of a np.ndarray), the program complains and promptly closes.
+    """
+    if isinstance(img, type(None)):
+        """
+        If the image is actually NoneType, the program complains and closes.
+        
+        And you may ask yourself 'why am I doing this in such a convoluted way?'
+        Simple answer: There is no simpler way to do it.
+        Opencv doesn't throw an exception if the image couldn't be read, it just
+        returns None.
+        So, if it does return None, I could just detect it with 'if im == None',
+        right? WRONG!
+        Thing is, if it doesn't return None, it returns a numpy.ndarray. And if
+        you attempt to compare one of those against None, guess what? You get
+        a ValueError and a snarky comment saying 'oh no the truth value of this
+        is ambiguous pls use .any() or .all() instead'
+        But if I try to use those methods to check if the image exists, and the
+        image doesn't exist, guess what? You get an AttributeError.
+        
+        Now, do I want to bother with throwing and catching exceptions manually?
+        No. cba to deal with that overhead.
+        
+        Would I have preferred it if OpenCV could have just thrown an exception
+        or just returned an empty array instead of returning a mcfucking None?
+        
+        Yes.
+        
+        But, alas, we live in a society. Rant over.
+        """
+        print("ERROR: Could not open the file called " + filename)
+        sys.exit(1)
+
+
 """
 -- THE MAIN PROGRAM --
 
 Everything from here is the stuff that runs when you start running this.
 """
-
 
 if len(sys.argv) < 4:
     # If you don't give 3 command line arguments, the program will complain
@@ -517,15 +563,19 @@ frames: List[FramePosData] = []
 A list to hold the FramePosData objects with data for each frame
 """
 
-print("frame  identity  distance") # header for the required frame data info.
+print("frame  identity  distance")  # header for the required frame data info.
 
 for frame in range(0, nframes):
     # we work out the filenames for the left and right images for this frame,
     # and then we open those images using opencv.
+    # (and also check to see if the images could actually be opened.)
     fn_left = sys.argv[2] % frame
     im_left: np.ndarray = cv2.imread(fn_left)
+    checkIfImageWasOpened(fn_left, im_left)
+
     fn_right = sys.argv[3] % frame
     im_right: np.ndarray = cv2.imread(fn_right)
+    checkIfImageWasOpened(fn_left, im_left)
 
     if testing:
         """
@@ -549,8 +599,6 @@ for frame in range(0, nframes):
     # and we also print the data we need to print
     fData.printFrameData()
 
-
-
     # TODO
     # we know background is exactly black
     # each object is a different colour
@@ -566,8 +614,6 @@ for frame in range(0, nframes):
     #   look at those regions in the colour image
     #   identify the colour
     #   ta-daa
-
-
 
 # TODO
 # work out trajectory of each object.
