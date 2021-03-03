@@ -4,7 +4,7 @@ import numpy as np
 import scipy as sp
 from scipy import ndimage as si
 import typing
-from typing import Tuple, List
+from typing import Tuple, List, Dict
 
 """
 opencv version 4.3.0
@@ -25,6 +25,26 @@ depth = f m b/disparity
 f[12m] = sqrt(640^2 + 480^2)/
 """
 
+
+
+
+def handleShowingStuff() -> None:
+    """
+    This is here to handle actually showing stuff when testing the program.
+    Prints something to console to let me know that I need to press something,
+    handles doing the cv2.waitKey(0) call,
+    and, if I press q or escape, it will close the program.
+    :return: nothing is returned.
+    """
+    print("pls to press")
+    key = cv2.waitKey(0)
+    # quit if escape (27) or q (113) are pressed
+    if key == 27 or key == 113:
+        cv2.destroyAllWindows()
+        print("quitting!")
+        sys.exit(0)
+
+
 testing: bool = False
 
 # order in which the masks of objects are returned
@@ -33,27 +53,45 @@ objectOrder: List[str] = \
 
 # HSV values to be used to extract the objects from the image.
 min_cyan: Tuple[int, int, int] = (90, 0, 0)
+"""minimum HSV threshold for the cyan object"""
 max_cyan: Tuple[int, int, int] = (90, 255, 255)
+"""maximum HSV threshold for the cyan object"""
 
 min_red: Tuple[int, int, int] = (0, 1, 0)
+"""minimum HSV threshold for the red object"""
 max_red: Tuple[int, int, int] = (0, 255, 255)
+"""maximum HSV threshold for the red object"""
 
 min_white: Tuple[int, int, int] = (0, 0, 1)
+"""minimum HSV threshold for the white object"""
 max_white: Tuple[int, int, int] = (0, 0, 255)
+"""maximum HSV threshold for the white object"""
 
 min_blue: Tuple[int, int, int] = (120, 1, 1)
+"""minimum HSV threshold for the blue object"""
 max_blue: Tuple[int, int, int] = (120, 255, 255)
+"""maximum HSV threshold for the blue object"""
 
 min_green: Tuple[int, int, int] = (60, 1, 1)
+"""minimum HSV threshold for the green object"""
 max_green: Tuple[int, int, int] = (60, 255, 255)
+"""maximum HSV threshold for the green object"""
 
 min_yellow: Tuple[int, int, int] = (30, 1, 0)
+"""minimum HSV threshold for the yellow object"""
 max_yellow: Tuple[int, int, int] = (30, 255, 255)
+"""maximum HSV threshold for the yellow object"""
 
 min_orange: Tuple[int, int, int] = (20, 0, 0)
+"""minimum HSV threshold for the orange object"""
 max_orange: Tuple[int, int, int] = (29, 255, 255)
+"""maximum HSV threshold for the orange object"""
 
 kernel33: np.ndarray = np.ones((3, 3), np.uint8)
+
+
+
+
 
 
 # gets the masks for each object in the given image.
@@ -82,6 +120,349 @@ def getObjectMasks(hsvIn: np.ndarray) -> Tuple[np.ndarray, np.ndarray,
 
     return (cyan_mask, red_mask, white_mask, blue_mask,
             green_mask, yellow_mask, orange_mask)
+
+
+
+def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
+    """
+    Returns the midpoint of the region of 1s in the given binary image array
+    :param objectMask: binary image, with 1s in the area where the object
+    with the midpoint being looked for is, and 0s everywhere else.
+    :return: A tuple containing:
+        * Tuple with the midpoint of the object (in middle of middle pixel)
+    """
+    if not objectMask.any():
+        # if nothing in the objectMask is a 1, we return -1s.
+        return (-1,-1)
+
+    yx: Tuple[int,int] = objectMask.shape
+    ny: int = yx[0]
+    nx: int = yx[1]
+
+    minX: int = -1
+    maxX: int = -1
+    minY: int = -1
+    maxY: int = -1
+    notFoundFirst: bool = True
+
+    for y in range(0, ny):
+        for x in range(0, nx):
+            if objectMask[y][x] != 0:
+                if notFoundFirst:
+                    notFoundFirst = False
+                    minX = maxX = x
+                    minY = maxY = y
+                else:
+                    if x < minX:
+                        minX = x
+                    elif x > maxX:
+                        maxX = x
+                    maxY = y
+                    # y wont get smaller.
+                    # and assignment has same complexity as checking a single
+                    # condition so I may as well just reassign y anyway.
+
+
+    w: int = (maxX - minX)
+    h: int = (maxY - minY)
+    # the +1s are here because I'm considering the width and height to be
+    # between the far edges of the minimum/maximum pixels,
+    # to account for the error that may arise in the pixel stuff.
+    #   pixel coords correspond to top-left corner of pixel,
+    #   so I'm using the midpoints of the pixel instead.
+    #
+    # here's some examples.
+    #   Outer numbers: pixel positions.
+    #   inner: X = in area, 0: not in area
+    #       * : where the midpoint should be.
+    #           if on a pixel, it's at the midpoint of that pixel.
+    #           if out of the grid, it's in that part of the grid.
+    #
+    # 0↴1↴|
+    # ↳*|0|
+    # 1-|-|
+    # ↳0|0|
+    # |-|-|
+    #
+    # Without the +1:
+    #   max would be n+0, min would be n+0; 0-0 = 0.
+    #   midpoint would be 0/2 = n+0
+    # With the +1:
+    #   max would be n+0+1, min would be n+0; 1-0 = 1.
+    #   midpoint would be 1/2 = n+0.5
+    #       right in the middle of that one pixel.
+    #
+    # 0↴1↴2↴3↴
+    # ↳X|X|X|0|
+    # 1-|-|-|-|
+    # ↳X|*|X|0|
+    # 2-|-|-|-|
+    # ↳X|X|X|0|
+    # 3-|-|-|-|
+    # ↳0|0|0|0|
+    # |-|-|-|-|
+    #
+    # Without the +1:
+    #   max would be n+2, min would be n+0; 2-0 = 2.
+    #   midpoint would be 2/2 = n+1
+    #       on the left edge of 2nd column/right edge of 1st; not exact.
+    # With the +1:
+    #   max would be n+2+1, min would be n+0; 3-0 = 3.
+    #   midpoint would be 3/2 = n+1.5
+    #       right in the middle of the 2nd column; exact.
+    #
+    # 0↴1↴2↴3↴4↴
+    # ↳X|X|X|X|0|
+    # 1-|-|-|-|-|
+    # ↳X|X|X|X|0|
+    # 2-|-*-|-|-|
+    # ↳X|X|X|X|0|
+    # 3-|-|-|-|-|
+    # ↳X|X|X|X|0|
+    # 4-|-|-|-|-|
+    # ↳0|0|0|0|0|
+    # |-|-|-|-|-|
+    #
+    #
+    # Without the +1:
+    #   max would be n+3, min would be n+0; 3-0 = 3.
+    #   midpoint would be 3/2 = n+1.5
+    #       in the middle of the 2nd column pixels; not exact.
+    # With the +1:
+    #   max would be n+3+1, min would be n+0; 4-0 = 4.
+    #   midpoint would be 4/2 = n+2
+    #       left edge of 3rd column/right edge of 2nd; exact.
+
+    xMid: float = minX + (w/2.0)
+    yMid: float = minY + (h/2.0)
+
+    return xMid, yMid
+
+
+
+def getObjectMidpoints(hsvIn: np.ndarray) -> Dict[str, Tuple[float,float]]:
+    """
+    Gets the midpoints for the objects that may be in the coloured image.
+    :param hsvIn: the hsv image that contains the objects
+    :return: dict with midpoints for each of the 7 coloured objects
+    that might be present in the given image.
+    Keys are (cyan, red, white, blue, green, yellow, orange)
+    """
+    # generating masks for each object.
+    cyan_mask: np.ndarray = cv2.inRange(hsvIn, min_cyan, max_cyan)
+    red_mask: np.ndarray = cv2.inRange(hsvIn, min_red, max_red)
+    white_mask: np.ndarray = cv2.inRange(hsvIn, min_white, max_white)
+    blue_mask: np.ndarray = cv2.inRange(hsvIn, min_blue, max_blue)
+    green_mask: np.ndarray = cv2.inRange(hsvIn, min_green, max_green)
+    yellow_mask: np.ndarray = cv2.inRange(hsvIn, min_yellow, max_yellow)
+    orange_mask: np.ndarray = cv2.inRange(hsvIn, min_orange, max_orange)
+
+    # and now, time for some cleanup
+
+    # filling in the midpoint for the cyan mask (as that's actually white)
+    cyan_mask = cv2.morphologyEx(cyan_mask, cv2.MORPH_CLOSE, kernel33)
+
+    # removing the midpoint in the cyan mask from the white mask
+    white_mask = cv2.subtract(white_mask, cyan_mask)
+
+    # filling in the midpoint for the orange mask (as that's actually yellow)
+    orange_mask = cv2.morphologyEx(orange_mask, cv2.MORPH_CLOSE, kernel33)
+
+    # and removing the orange midpoint from some yellow
+    yellow_mask = cv2.subtract(yellow_mask, orange_mask)
+
+    # now I'm making the dictionary with the midpoints of each object
+    posDict: Dict[str, Tuple[float,float]] = {
+        "cyan":   getObjectMidpoint(cyan_mask),
+        "red":    getObjectMidpoint(red_mask),
+        "white":  getObjectMidpoint(white_mask),
+        "blue":   getObjectMidpoint(blue_mask),
+        "green":  getObjectMidpoint(green_mask),
+        "yellow": getObjectMidpoint(yellow_mask),
+        "orange": getObjectMidpoint(orange_mask)
+    }
+
+    return posDict
+
+
+def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
+    Dict[str,Tuple[Tuple[float, float],Tuple[float, float]]]:
+    """
+    Gets the positions of objects in the left and right *coloured* images.
+    This **will** assume that the dimensions of the left and right images
+    are identical, and that the two images are Y-aligned already.
+    :param left_in: the left input image *in colour*
+    :param right_in: the right input image *in colour*
+    :return: a dictionary with the x and y positions of each of the objects
+    in each image.
+
+    1st item in the tuple: (xl,y') from left image.
+    2nd item in the tuple: (xr,y') from right image.
+
+    If an object is not present in **both** images, it will **not** be present
+    in the returned dictionary.
+    :raises: ValueError if the two images provided have different dimensions.
+    """
+    # gets the shape of the images
+    yx: Tuple[int, int] = left_in.shape
+    if yx != right_in.shape:
+        # complains if the dimensions aren't identical.
+        raise ValueError("Please provide images with identical shapes.")
+
+    # gets midpoints for all the objects in each image.
+
+    lDict: Dict[str, Tuple[float, float]] = getObjectMidpoints(left_in)
+    """dictionary with midpoints for every object in the left image"""
+
+    rDict: Dict[str, Tuple[float, float]] = getObjectMidpoints(right_in)
+    """dictionary with midpoints for every object in the right image"""
+
+    # half of the x and y dimensions of the images
+    halfY: float = yx[0]/2
+    halfX: float = yx[1]/2
+
+    posDict: Dict[str, Tuple[Tuple[float, float], Tuple[float,float]]] = {}
+    """a dictionary for all the calculated (X',Y') positions for each image"""
+
+    # obtains the keys from lDict but as a list so it can be foreach'd
+    leftKeys: List[str] = [*lDict.keys()]
+
+    # now looks through each of those keys
+    for k in leftKeys:
+        if lDict[k] != (-1,-1):
+            if rDict[k] != (-1,-1):
+                # if both dictionaries have an actual value for the key
+
+                # just getting a copy of those raw values real quick
+                rawL: Tuple[float, float] = lDict[k]
+                rawR: Tuple[float, float] = rDict[k]
+
+                # work out the X' and the Y' stuff for left and right
+                # and put it into the posDict.
+                #   X` = x - halfX
+                #   Y' = halfY - y
+                posDict[k] = (
+                    (rawL[0] - halfX, halfY - rawL[1]),
+                    (rawR[0] - halfX, halfY - rawR[1])
+                )
+    # and now return the posDict
+    return posDict
+
+
+
+
+class FramePosData:
+    """
+    This class basically holds positional information for the objects
+    in each frame.
+    """
+
+    placeholderOutString: str = "{:5}  {:8}  {:8.2e}  {}"
+    """
+    This is a placeholder string to be used when formatting the frame-by-frame
+    printout of object positions.
+    """
+
+    focalLength: float = 12
+    "Focal length of camera is 12m"
+    baseline: float = 3500
+    "baseline between cameras is 3.5km -> 3500m"
+    pixelSize: float = float(1e-5)
+    "pixel spacing: 10 microns -> 1e-5 metres"
+
+    def __init__(self, frameNumber: int, left: np.ndarray, right: np.ndarray):
+        """
+        Constructor for the framePosData stuff
+        :param frameNumber: what frame this is
+        :param left: the left image in BGR colour
+        :param right: the right image in BGR colour
+        """
+        self.frameNum: int = frameNumber
+
+        """
+        These are the left and right image X'Y' coords of every object
+        in both the left and the right images.
+        """
+        imgPositions: \
+            Dict[str, Tuple[Tuple[float, float], Tuple[float, float]]] = \
+            getStereoPositions(cv2.cvtColor(left, cv2.COLOR_BGR2HSV),
+                               cv2.cvtColor(right, cv2.COLOR_BGR2HSV))
+
+        """
+        This will hold the depths of the objects
+        """
+        self.distances: Dict[str, float] = {}
+
+        """
+        this will hold the x' and y' co-ords of the objects
+        """
+        self.posXYZ: Dict[str, Tuple[float, float, float]] = {}
+
+
+        objKeys: List[str] = [*imgPositions.keys()]
+        # unpacking the keys/object names so we can iterate through them.
+        for k in objKeys:
+            # we obtain the info about current object from imagePositions
+            currentPos: Tuple[Tuple[float, float], Tuple[float,float]] = \
+                imgPositions[k]
+
+            # x disparity = xl - xr
+            xDisparity: float = currentPos[0][0] - currentPos[1][0]
+
+            dist: float = ((FramePosData.focalLength * FramePosData.baseline) /
+                           (xDisparity * FramePosData.pixelSize))
+            """
+            Z = (f * b) / (xl - xr)
+            which is how we work out what dist is.
+            """
+
+
+            # putting the raw dist value into the distances dictionary
+            self.distances[k] = dist
+
+            rawX: float = ((-currentPos[1][0] * FramePosData.pixelSize) /
+                           FramePosData.focalLength) * dist
+            """
+            (-xr/f) = (X/Z), therefore (-xr/f) * Z = X
+            So I used that equation to find out what the actual X position
+            of the object is in 3D space.
+            """
+
+            # just obtaining the midpoint of the Ys real quick
+            yMid: float = (currentPos[0][1] + currentPos[1][1])/2
+
+            rawY: float = -((yMid * FramePosData.pixelSize) /
+                            FramePosData.focalLength) * dist
+            """
+            (xl / f) = (B-X)/Z 
+            so, substituting the x for y
+            (y / f) = (B-Y)/Z = -Y/Z
+            and if we rearrange that so -Y is the result
+            (y/f) * Z = -Y
+            and negating that to get positive Y as the result
+            -(y/f) * Z = Y
+            """
+
+            # we put the raw XYZ into posXYZ
+            self.posXYZ[k] = (rawX, rawY, dist)
+
+    def printFrameData(self) -> None:
+        """
+        This will be called when printing the data for the individual frames.
+        Prints the depths for all the objects encountered.
+        :return: nothing.
+        """
+        keys: List[str] = [*self.distances.keys()]
+
+        for k in keys:
+            print(FramePosData.placeholderOutString.format(
+                self.frameNum,
+                k,
+                self.distances[k],
+                self.posXYZ[k]
+            ))
+
+
 
 
 def getStereoMasks(left_in: np.ndarray, right_in: np.ndarray) -> \
@@ -124,7 +505,7 @@ def showAllMasksForTesting(i_left: np.ndarray, i_right:np.ndarray, f: int) -> \
                     cv2.FONT_HERSHEY_SIMPLEX, 1, 255, 2, cv2.LINE_AA)
         cv2.imshow("left", showLeft)
         cv2.imshow("right", m[1])
-        cv2.waitKey(0)
+        handleShowingStuff()
 
         showLeft = cv2.bitwise_and(i_left, i_left, mask=m[0])
         showRight = cv2.bitwise_and(i_right, i_right, mask=m[1])
@@ -133,129 +514,10 @@ def showAllMasksForTesting(i_left: np.ndarray, i_right:np.ndarray, f: int) -> \
                     cv2.LINE_AA)
         cv2.imshow("left", showLeft)
         cv2.imshow("right", showRight)
-        cv2.waitKey(0)
+        handleShowingStuff()
         i += 1
 
-params : cv2.SimpleBlobDetector_Params = cv2.SimpleBlobDetector_Params()
 
-params.minThreshold = 1
-params.maxThreshold = 255
-params.filterByArea = False
-params.filterByColor = False
-params.filterByCircularity = False
-params.filterByInertia = False
-params.filterByInertia = False
-params.minArea = 1
-params.minDistBetweenBlobs = 0
-
-blobby : cv2.SimpleBlobDetector = cv2.SimpleBlobDetector_create(params)
-
-
-def getKeypoints(leftMask: np.ndarray,
-                 rightMask: np.ndarray) -> Tuple[cv2.KeyPoint, cv2.KeyPoint]:
-    leftDilated = cv2.blur(leftMask, kernel33)
-    leftKP = blobby.detect(leftDilated)
-
-
-
-
-
-
-class FrameData:
-    masks_cyan: Tuple[np.ndarray, np.ndarray]
-    kp_cyan: Tuple[cv2.KeyPoint, cv2.KeyPoint]
-    dist_cyan: float
-    masks_red: Tuple[np.ndarray, np.ndarray]
-    kp_red: Tuple[cv2.KeyPoint, cv2.KeyPoint]
-    dist_red: float
-    masks_white: Tuple[np.ndarray, np.ndarray]
-    kp_white: Tuple[cv2.KeyPoint, cv2.KeyPoint]
-    dist_white: float
-    masks_blue: Tuple[np.ndarray, np.ndarray]
-    kp_blue: Tuple[cv2.KeyPoint, cv2.KeyPoint]
-    dist_blue: float
-    masks_green: Tuple[np.ndarray, np.ndarray]
-    kp_green: Tuple[cv2.KeyPoint, cv2.KeyPoint]
-    dist_green: float
-    masks_yellow : Tuple[np.ndarray, np.ndarray]
-    kp_yellow: Tuple[cv2.KeyPoint, cv2.KeyPoint]
-    dist_yellow: float
-    masks_orange = Tuple[np.ndarray, np.ndarray]
-    kp_orange: Tuple[cv2.KeyPoint, cv2.KeyPoint]
-    dist_orange: float
-    placeholderOutString: str = "{:5D} {:8} {:8.2E}"
-
-    def __init__(self, frameNumber: int, left: np.ndarray, right: np.ndarray):
-        self.frameNum: int = frameNumber
-        self.left: np.ndarray = left
-        self.right: np.ndarray = right
-        self.has_cyan: bool = False
-        self.has_red: bool = False
-        self.has_white: bool = False
-        self.has_blue: bool = False
-        self.has_green: bool = False
-        self.has_yellow: bool = False
-        self.has_orange: bool = False
-
-    def generateTheMasks(self):
-
-        if testing:
-            showAllMasksForTesting(self.left, self.right, self.frameNum)
-
-        theMasks: List[Tuple[np.ndarray, np.ndarray]] =\
-            getStereoMasks(self.left, self.right)
-
-        if theMasks[0][0].any() or theMasks[0][1].any():
-            self.has_cyan = True
-            self.masks_cyan = theMasks[0]
-        if theMasks[1][0].any() or theMasks[1][1].any():
-            self.has_red = True
-            self.masks_red = theMasks[1]
-        if theMasks[2][0].any() or theMasks[2][1].any():
-            self.has_white = True
-            self.masks_white = theMasks[2]
-        if theMasks[3][0].any() or theMasks[3][1].any():
-            self.has_blue = True
-            self.masks_blue = theMasks[3]
-        if theMasks[4][0].any() or theMasks[4][1].any():
-            self.has_green = True
-            self.masks_green = theMasks[4]
-        if theMasks[5][0].any() or theMasks[5][1].any():
-            self.has_yellow = True
-            self.masks_yellow = theMasks[5]
-        if theMasks[6][0].any() or theMasks[6][1].any():
-            self.has_orange = True
-            self.masks_orange = theMasks[6]
-
-    #def getKeypoints(self):
-
-
-    def printIndividualFrameData(self):
-        if self.has_cyan:
-            print(self.placeholderOutString.format(self.frameNum, "cyan",
-                                                   self.dist_cyan))
-            if self.has_red:
-                print(self.placeholderOutString.format(self.frameNum, "red",
-                                                       self.dist_cyan))
-            if self.has_white:
-                print(self.placeholderOutString.format(self.frameNum, "white",
-                                                       self.dist_white))
-            if self.has_blue:
-                print(self.placeholderOutString.format(self.frameNum, "blue",
-                                                       self.dist_blue))
-            if self.has_green:
-                print(self.placeholderOutString.format(self.frameNum, "green",
-                                                       self.dist_green))
-            if self.has_yellow:
-                print(self.placeholderOutString.format(self.frameNum, "yellow",
-                                                       self.dist_yellow))
-            if self.has_orange:
-                print(self.placeholderOutString.format(self.frameNum, "orange",
-                                                       self.dist_orange))
-
-
-
-# print(cv2.__version__)
 
 if len(sys.argv) < 3:
     print("Usage:", sys.argv[0],
@@ -267,9 +529,8 @@ if len(sys.argv) < 3:
 
 print("deez nutz lmao gottem")
 
-orb : cv2.ORB = cv2.ORB_create()
 
-
+frames: List[FramePosData] = []
 
 
 nframes: int = int(sys.argv[1])
@@ -284,156 +545,12 @@ for frame in range(0, nframes):
         print(fn_right)
         cv2.imshow("left", im_left)
         cv2.imshow("right", im_right)
-        cv2.waitKey(0)
+        handleShowingStuff()
         showAllMasksForTesting(im_left, im_right, frame)
 
-    drawLeft = im_left
-    drawRight = im_right
-    masks = getStereoMasks(im_left, im_right)
+    frames.append(FramePosData(frame, im_left, im_right))
 
-    needToWaitAtTheEnd: bool = True
-    for m in masks:
-        needToWait = False
-        needToWaitAtTheEnd = True
-        maskedLeft = cv2.bitwise_and(im_left, im_left, mask = m[0])
-        kpLeft = orb.detect(im_left, m[0])
-        kpLeft, desLeft = orb.compute(im_left, kpLeft)
-        print("left")
-
-        whiteArea = []
-        nx, ny = m[0].shape
-        for x in range(0, nx):
-            for y in range(0, ny):
-                #print(m[0][x][y])
-                if m[0][x][y] != 0:
-                    whiteArea.append((x,y))
-        print(whiteArea)
-        # TODO: work out what I can actually do with this list of white pixels
-
-        labelled, lCount = si.label(m[0])
-        #print(labelled)
-        #cv2.imshow("labelled", labelled)
-        #cv2.waitKey(0)
-        print(lCount)
-        leftMaskBlurred = cv2.dilate(m[0], kernel33)
-
-        #cv2.imshow("lBlurred", leftMaskBlurred)
-
-        leftBlobby = blobby.detect(m[0])
-        #leftBlobby = blobby.detect(leftMaskBlurred)
-
-        #leftBlobby, desLeftBlobby = blobby.compute(im_left, leftBlobby)
-        if len(leftBlobby) >= 1:
-            print(leftBlobby[0].pt)
-        else:
-            print("no blobby")
-            needToWait = True
-        #print(leftBlobby)
-
-        #print("desc")
-        #print(desLeft)
-
-
-
-        drawLeft = cv2.drawKeypoints(drawLeft, leftBlobby, None,
-                                     color = (255,0,255), flags = 0)
-
-
-
-
-        maskedRight = cv2.bitwise_and(im_right, im_right, mask=m[1])
-
-
-
-        #kpRight = orb.detect(im_right, m[1])
-        #kpRight, desRight = orb.compute(im_right, kpRight)
-
-        rightMaskBlurred = cv2.dilate(m[1], kernel33, iterations=2)
-
-        cv2.imshow("rBlurred", rightMaskBlurred)
-        rightBlobby = blobby.detect(rightMaskBlurred)
-        print("right")
-        if len(rightBlobby) >= 1:
-            print(rightBlobby[0].pt)
-        else:
-            print("no blobby")
-            needToWait = True
-        #rightBlobby, desRightBlobby = blobby.compute(im_right, rightBlobby)
-
-        rightContours = cv2.findContours(m[1], cv2.RETR_EXTERNAL,
-                                        cv2.CHAIN_APPROX_SIMPLE)
-
-        #drawRight = cv2.drawContours(drawRight, rightContours, 0,
-         #                           (255, 0, 255), 1)
-        #print(desRight)
-
-        drawRight = cv2.drawKeypoints(drawRight, rightBlobby, None,
-                                     color=(255, 0, 255), flags=0)
-        cv2.imshow("left", drawLeft)
-        cv2.imshow("right", drawRight)
-
-        #disparityMap = stereo.compute(maskedLeft, maskedRight)
-        #disparityMap = stereo.compute(im_left, im_right)
-        #cv2.imshow("disparity map", disparityMap)
-        if needToWait:
-            cv2.waitKey(0)
-            needToWaitAtTheEnd = False
-    if needToWaitAtTheEnd:
-        cv2.waitKey(0)
-
-    """
-    kpLeft = orb.detect(im_left)
-    kpLeft, desLeft = orb.compute(im_left, kpLeft)
-
-    print(desLeft)
-
-    drawLeft = cv2.drawKeypoints(drawLeft, kpLeft, None,
-                                 color=(255, 0, 255), flags=0)
-
-    kpRight = orb.detect(im_right)
-    kpRight, desRight = orb.compute(im_left, kpRight)
-
-    print(desRight)
-
-    drawRight = cv2.drawKeypoints(drawRight, kpRight, None,
-                                  color=(255, 0, 255), flags=0)
-    """
-    cv2.imshow("left", drawLeft)
-    cv2.imshow("right", drawRight)
-    cv2.waitKey(0)
-
-
-
-    #testMasks(im_left)
-
-
-
-
-    #_, leftMask = cv2.threshold(leftGreyscale, 0, 255, cv2.THRESH_BINARY)
-
-    #cv2.imshow("left greyscale", leftGreyscale)
-    #cv2.waitKey(0)
-    #cv2.imshow("left mask", leftMask)
-    #acv2.waitKey(0)
-
-    #leftHSV = cv2.cvtColor(im_left, cv2.COLOR_BGR2HSV)
-
-    #left_m_cyan = cv2.inRange(leftHSV, min_cyan, max_cyan)
-    #left_m_red = cv2.inRange(leftHSV, min_red, max_red)
-
-    #print(type(leftHSV))
-
-    #getObjectMasks(leftHSV)
-
-    # print(type(leftHSV[0,0]))
-    # print(leftHSV[0,0])
-
-    #keypoints = detector.detect(im_left, mask=leftMask)
-    # kp, des = detector.compute(im_left, mask = leftMask)
-
-    #print(keypoints)
-    # print(kp)
-    # print(des)
+    print("next pls")
 
     # TODO
     # we know background is exactly black
@@ -450,6 +567,16 @@ for frame in range(0, nframes):
     #   look at those regions in the colour image
     #   identify the colour
     #   ta-daa
+
+print("frame  identity  distance")
+for f in frames:
+    f.printFrameData()
+
+# TODO
+# work out trajectory of each object.
+# I have XYZ pos of each object for each frame that they're there for,
+# I just need to use them
+
 
 print("sugma")
 

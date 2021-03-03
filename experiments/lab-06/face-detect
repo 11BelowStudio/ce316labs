@@ -307,6 +307,12 @@ face_cascade = load_cascade ("haarcascade_frontalface_alt.xml")
 #eye_cascade = load_cascade("haarcascade_righteye_2splits.xml")
 eye_cascade = load_cascade("haarcascade_eye.xml")
 
+# how to work out which haar cascade is most effective?
+#   images with known face counts and locations
+#   have the known face counts and locations noted
+#   compare the results from the haar cascades with the known/expected outcomes
+
+
 # If filenames were supplied, we process them; if not, we use live video.
 if len (args.images) < 1 or args.images[0] == "":
     print ("Using video")
