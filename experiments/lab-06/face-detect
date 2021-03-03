@@ -21,8 +21,39 @@ def load_cascade (fn):
     return None
 
 
+"""
+A list with tuples for predefined colours for use when drawing stuff
+"""
+predefinedColours = [
+    ((200, 100, 100),"blue"),
+    ((0, 255, 0),"green"),
+    ((255, 255, 0),"cyan"),
+    ((0, 255, 255),"yellow"),
+    ((255, 0, 255),"magenta"),
+    ((255, 128, 128),"off blue"),
+    ((128, 255, 128),"off green"),
+    ((128, 128, 255),"off red")
+    ]
+colourCounter = 0
+
+
+def getPredefinedColour():
+    """
+    obtains a colour (in the form of a BGR tuple) from the list of
+    predefinedColours, so it'll be possible to tell which thing is which
+    :return: a BGR colour tuple
+    """
+    global colourCounter
+    yourColour = predefinedColours[colourCounter]
+    colourCounter += 1
+    colourCounter %= len(predefinedColours)
+    return yourColour
+
+
 def detect (im, face_cascade, eye_cascade, do_value, delay=100):
     "Detect a face using Haar cascades, as in Viola-Jones, and the eyes within."
+
+
 
     # Create a grey-scale version of the image if necessary, either directly or
     # using the value channel of an HSV version; Inas Al-Taie says the latter
@@ -36,20 +67,219 @@ def detect (im, face_cascade, eye_cascade, do_value, delay=100):
             grey = cv2.cvtColor (im, cv2.COLOR_BGR2GRAY)
     else:
         grey = im
+    """
+    image
+        Matrix of the type CV_8U containing an image where objects are detected.
+    scaleFactor = 1.1
+        Parameter specifying how much the image size is reduced at each image scale.
+    minNeighbors = 3
+        Parameter specifying how many neighbors each candidate rectangle should have to retain it.
+    flags = 0
+        Parameter with the same meaning for an old cascade as in the function
+        cvHaarDetectObjects. It is not used for a new cascade.
+    minSize
+        Minimum possible object size. Objects smaller than that are ignored.
+    maxSize
+        Maximum possible object size. Objects larger than that are ignored.
+        If maxSize == minSize model is evaluated on single scale.
+        
+    returns:
+    objects
+        Vector of rectangles where each rectangle contains the detected object,
+        the rectangles may be partially outside the original image.
+    numDetections (if detectMultiScale2 is used)
+        Vector of detection numbers for the corresponding objects.
+        An object's number of detections is the number of neighboring positively
+        classified rectangles that were joined together to form the object. 
+    """
+
     faces = face_cascade.detectMultiScale (grey, scaleFactor=1.1, minNeighbors=5)
+
+    print(len(faces))
+
+    """
+    55 people in the image.
+    outcomes with different parameters:
+        scaleFactor=1.01, minNeighbors=3
+            61 matches
+                4 faces missing
+                8 false positives
+        scaleFactor = 1.1, minNeighbours=5
+            42 matches
+                13 faces missing
+                0 false positives
+        caleFactor=1.01, minNeighbors=5
+            59 matches
+                4 faces missing
+                6 false positives
+        scaleFactor=1.1, minNeighbors=3
+            47 matches
+                9 missing
+                1 false positive
+        scaleFactor=1.1, minNeighbors=4
+            45 matches
+                11 missing
+                no obvious false positives
+        scaleFactor=1.05, minNeighbors=4
+            49 matches
+                7 missing
+                no obvious false positives
+        scaleFactor=1.05, minNeighbors=5
+            48 matches
+                7 missing
+                no obvious false positives
+        scaleFactor=1.025, minNeighbors=5
+            52 matches
+                5 missing
+                no obvious false positives
+        scaleFactor=1.0125, minNeighbors=5
+            54 matches
+                5 missing
+                1 obvious false positive
+        scaleFactor=1.025, minNeighbors=4
+            52 matches
+                5 missing
+                no obvious false positives
+        scaleFactor=1.025, minNeighbors=3
+            54 matches
+                4 missing
+                1 obvious false positive
+    """
+
+    """
+    common characteristics of faces which couldn't be found
+        * glasses with shiny lenses
+        * looking away from camera
+        * behind someone else
+    common characteristics of false positives
+        * some form of dark T shape
+            * tie/collar
+            * side of a sleeve
+            * someone's side hair in front of someone else's shoulder
+                in front of a white shirt
+            * sandal with a vertical stripe
+    """
+
+    # a list of all the known valid eyes
+    validEyes = []
+    # and a list of all the pair lines between midpoints of valid eyes
+    validEyePairLinesAndColours = []
+
+    # a list of all the known invalid eyes
+    invalidEyes = []
+
 
     # Locate the faces and draw the surrounding rectangles on the images.
     # Do the same with the eyes.
     for (x, y, w, h) in faces:
         print ("  face at", x ,y, x+w, y+h)
+        #faceColour = getPredefinedColour()
         cv2.rectangle (im, (x,y), (x+w,y+h), (255,0,0), 2)
+        #cv2.rectangle(im, (x, y), (x + w, y + h), faceColour, 2)
         roi_grey = grey[y:y+h, x:x+w]
         roi_color =  im[y:y+h, x:x+w]
         if eye_cascade is not None:
-            eyes = eye_cascade.detectMultiScale (roi_grey)
+            lowerEyeYBound = (h / 2)
+            print(lowerEyeYBound)
+            eyes = eye_cascade.detectMultiScale (roi_grey, scaleFactor= 1.05, minNeighbors=5)
+            print("found " + str(len(eyes)) + " eyes")
+            potentiallyValidEyes = []
             for (ex, ey, ew, eh) in eyes:
-                print ("    eye at", ex, ey, ex+ew, ey+eh)
-                cv2.rectangle (roi_color, (ex,ey), (ex+ew,ey+eh), (0,255,0), 2)
+                rawX = ex + x
+                rawY = ey + y
+                rawEye = ((rawX, rawY), (rawX + ew, rawY + eh))
+                if ey > lowerEyeYBound:
+                    invalidEyes.append(rawEye)
+                    continue
+                else:
+                    potentiallyValidEyes.append(rawEye)
+            if len(potentiallyValidEyes) < 2:
+                invalidEyes.extend(potentiallyValidEyes)
+            else:
+                knownValid = []
+                for i in range(0, len(potentiallyValidEyes)):
+                    if i in knownValid:
+                        continue
+                    print("i " + str(i))
+                    for j in range((i+1), len(potentiallyValidEyes)):
+                        if j in knownValid:
+                            continue
+                        print("j " + str(j))
+                        e1 = potentiallyValidEyes[i]
+                        e2 = potentiallyValidEyes[j]
+
+                        # y midpoints for each eye
+                        e1Ymid = (e1[1][1] + e1[0][1])/2
+                        e2Ymid = (e2[1][1] + e2[0][1])/2
+                        # absolute value between the y midpoints
+                        yMidDiff = abs(e1Ymid-e2Ymid)
+                        # also absolute value between the upper/lower edges of eye
+                        upperDiff = abs(e1[0][1] - e2[0][1])
+                        lowerDiff = abs(e1[1][1] - e2[1][1])
+
+                        yDiff = min(yMidDiff, upperDiff, lowerDiff)
+                        # the yDiff we use is the lowest of the y differences.
+
+                        if (yDiff < (y/4)):
+                            # if the y difference between the eyes is less
+                            # than a quarter pf the total y size of the face,
+                            # we consider these eyes to be a pair.
+
+                            # adding these indices to the knownValid list
+                            knownValid.append(i)
+                            knownValid.append(j)
+
+                            # picking a colour to draw these eyes
+                            theColour, colourName = getPredefinedColour()
+                            print("\t" + colourName + " pair")
+                            # adding the valid eyes and their colours
+                            # to the validEyes list
+                            validEyes.append((e1, theColour))
+                            validEyes.append((e2, theColour))
+
+                            # printing details about the eyes
+                            print("\teye at", e1)
+                            print("\teye at", e2)
+
+                            # working out x midpoints as well for each eye
+                            e1Xmid = (e1[1][0] + e1[0][0]) / 2
+                            e2Xmid = (e2[1][0] + e2[0][0]) / 2
+
+                            # adding a tuple with the two eye midpoints
+                            # along with a colour for the pair of eyes
+                            # to the validEyePairLinesAndColours list
+                            eyePairTuple = (
+                                    (int(e1Xmid), int(e1Ymid)),
+                                    (int(e2Xmid), int(e2Ymid))
+                                )
+                            print(eyePairTuple)
+                            validEyePairLinesAndColours.append(
+                                (eyePairTuple, theColour)
+                            )
+
+                            break
+
+                if len(knownValid) < len(potentiallyValidEyes):
+                    for i in range(0, len(potentiallyValidEyes)):
+                        if i not in knownValid:
+                            invalidEyes.append(potentiallyValidEyes[i])
+
+    # showing all the eye pair lines
+    if len(validEyePairLinesAndColours) > 0:
+        for p in validEyePairLinesAndColours:
+            cv2.line(im, p[0][0],p[0][1], p[1],1)
+
+    # showing outlines of all the invalid eyes
+    if len(invalidEyes) > 0:
+        for inv in invalidEyes:
+            cv2.rectangle(im, inv[0],inv[1], (0,0,255), 1)
+
+    # showing all the valid eyes
+    if len(validEyes) > 0:
+        for v in validEyes:
+            cv2.rectangle(im, v[0][0], v[0][1], v[1],2)
+
+
 
     # Display the result, quitting if the user types "q" or <esc>.
     cv2.imshow (sys.argv[0], im)
@@ -72,7 +302,10 @@ if isinstance (args.images, str):
 
 # Load the cascades that we shall use for finding faces and eyes. 
 face_cascade = load_cascade ("haarcascade_frontalface_alt.xml")
-eye_cascade = load_cascade ("haarcascade_lefteye_2splits.xml")
+#face_cascade = load_cascade("haarcascade_frontalface_default.xml")
+#eye_cascade = load_cascade("haarcascade_lefteye_2splits.xml")
+#eye_cascade = load_cascade("haarcascade_righteye_2splits.xml")
+eye_cascade = load_cascade("haarcascade_eye.xml")
 
 # If filenames were supplied, we process them; if not, we use live video.
 if len (args.images) < 1 or args.images[0] == "":
@@ -89,7 +322,7 @@ else:
         im = cv2.imread (imfn)
         detect (im, face_cascade, eye_cascade, args.v)
         if len (args.images) > 1:
-            cv2.waitKey (20)
+            cv2.waitKey (5000)
         else:
             cv2.waitKey (0)
     cv2.destroyAllWindows ()
