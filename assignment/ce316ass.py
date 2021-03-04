@@ -5,7 +5,7 @@ import scipy as sp
 from scipy import ndimage as si
 import typing
 from typing import Tuple, List, Dict, Union
-from math import sqrt
+from math import sqrt, isclose
 
 """
 opencv version 4.3.0
@@ -626,22 +626,45 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
     return posXYZ
 
 
-def getNormDifferenceBetweenPoints(fromPoint: Tuple[float, float, float],
-                                   toPoint: Tuple[float, float, float]) -> \
+def normalizeVector(v: Tuple[float, float, float]) -> \
+        Tuple[float, float, float]:
+    """
+    Normalizes a given 3D vector v
+    :param v: the vector to normalize (as a tuple of floats)
+    :return: that vector but normalized
+    """
+    mag: float = sqrt((v[0] ** 2) + (v[1] ** 2) + (v[2] ** 2))
+    """
+    The magnitude of the 3d vector
+    dist between 2 3D points:
+        sqrt( ((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
+            and we know that x1,y1,z1 = 0 already
+                (because that's how polar vectors work)
+            so we just square, add, and root v[0], v[1], and v[2].
+    """
+    if mag == 0:
+        return 0, 0, 0
+    else:
+        return v[0]/mag, v[1]/mag, v[2]/mag
+
+def getNormVectorBetweenPoints(fromPoint: Tuple[float, float, float],
+                               toPoint: Tuple[float, float, float],
+                               rounding: int = 0) -> \
     Tuple[float, float, float]:
     """
-    This will get the normalized difference between two points in 3D space.
+    This will get the normalized vector between two points in 3D space, rounded
+    to the given 'rounding' decimal places (unrounded if 0 is provided)
 
-    >>> getNormDifferenceBetweenPoints((0,0,0),(1,1,1))
+    >>> getNormVectorBetweenPoints((0,0,0),(1,1,1))
     (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
 
-    >>> getNormDifferenceBetweenPoints((0,0,0),(2,2,2))
+    >>> getNormVectorBetweenPoints((0,0,0),(2,2,2))
     (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
 
-    >>> getNormDifferenceBetweenPoints((0,0,0),(1,1.5,2))
+    >>> getNormVectorBetweenPoints((0,0,0),(1,1.5,2))
     (0.3713906763541037, 0.5570860145311556, 0.7427813527082074)
 
-    >>> getNormDifferenceBetweenPoints((1,1,1),(1,1,1))
+    >>> getNormVectorBetweenPoints((1,1,1),(1,1,1))
     (0, 0, 0)
 
     :param fromPoint: x,y,z coordinates of the point we're coming from
@@ -670,7 +693,99 @@ def getNormDifferenceBetweenPoints(fromPoint: Tuple[float, float, float],
         return 0, 0, 0
     else:
         # if distance isn't 0, we return the differences over the distance
-        return xDiff/dist, yDiff/dist, zDiff/dist
+        if rounding == 0:
+            return xDiff / dist, yDiff / dist, zDiff / dist
+        else:
+            if rounding < 0:
+                rounding = abs(rounding)
+            return round(xDiff / dist, rounding),\
+                   round(yDiff / dist, rounding),\
+                   round(zDiff / dist, rounding)
+
+
+def isThisAStraightLine(line: List[Tuple[float, float, float]]) -> bool:
+    """
+    Returns whether or not a sequence of 3D points is a straight line,
+    using the getNormDifferenceBetweenPoints function.
+
+    If there's 2 or fewer points, it certainly ain't bent, so it will return
+    true. Otherwise, it'll return true if all the points have an identical
+    normalized vector between them, false otherwise.
+
+    :param line: the sequence of 3D points
+    :return: true if they're a straight line, false otherwise.
+    """
+
+    if len(line) < 3:
+        return True
+
+    thisIndex: int = 1
+    """ A cursor to the index of the line used for this iteration """
+
+    normDiff: Tuple[float, float, float] = \
+        getNormVectorBetweenPoints(line[0], line[1])
+    """ the normalized difference between points 0 and 1 """
+
+    lastDiff: Tuple[float, float, float] = normDiff
+
+    totalDiff: List[float, float, float] = [0, 0, 0]
+
+    print(normDiff)
+
+    susCount: int = 0
+
+    maxSus: int = int(len(line)/8)
+
+    for i in range(1, len(line)):
+        thisDiff: Tuple[float, float, float] = \
+            getNormVectorBetweenPoints(line[i-1], line[i])
+        totalDiff[0] = (totalDiff[0] + thisDiff[0])/2
+        totalDiff[1] = (totalDiff[1] + thisDiff[1])/2
+        totalDiff[2] = (totalDiff[2] + thisDiff[2])/2
+
+    print(totalDiff)
+
+    avgDiff: Tuple[float, float, float] = normalizeVector(
+        (totalDiff[0], totalDiff[1], totalDiff[2]))
+
+    totalDiff[0] = totalDiff[0] / (len(line) - 1)
+    totalDiff[1] = totalDiff[1] / (len(line) - 1)
+    totalDiff[2] = totalDiff[2] / (len(line) - 1)
+
+    print(avgDiff)
+    print("")
+
+    while True:
+        thisIndex += 1 #we move to the next index of the list
+        if thisIndex == len(line):
+            # we're basically emulating a do/while loop here
+            # with a while condition of thisIndex < len(line)
+            # and if the program hasn't failed yet, this succeeded.
+            return True
+
+        thisDiff = \
+            getNormVectorBetweenPoints(line[thisIndex-1], line[thisIndex])
+
+        print(thisDiff)
+
+        # if the normalized difference between the previous index and this index
+        # is not identical to the original normalized difference
+        # if getNormVectorBetweenPoints(line[thisIndex-1], line[thisIndex]) != \
+        #    normDiff:
+        if not (isclose(avgDiff[0], thisDiff[0]) or
+                isclose(avgDiff[1], thisDiff[1]) or
+                isclose(avgDiff[2], thisDiff[2])):
+            susCount += 1
+            if susCount == maxSus:
+                print("Failed at frame " + str(thisIndex))
+                return False
+            else:
+                print("Frame " + str(thisIndex) + " is sus " + str(susCount))
+
+        #lastDiff = thisDiff
+
+
+
 
 
 def checkIfImageWasOpened(filename: str, img: Union[np.ndarray, None]) -> None:
@@ -732,13 +847,8 @@ if len(sys.argv) < 4:
 # reads the 1st actual command line argument as the count of frames to look at
 nframes: int = int(sys.argv[1])
 
-objectIdentifiers: List[str] = \
-        ["cyan", "red", "white", "blue", "green", "yellow", "orange"]
-"""
-This is a list with all the object names in it.
-"""
 
-objectPositions: Dict[str, List[Tuple[float, float, float, bool]]] = {
+objectPositions: Dict[str, List[Tuple[float, float, float]]] = {
     "cyan": [],
     "red": [],
     "white": [],
@@ -779,9 +889,10 @@ for frame in range(0, nframes):
     We obtain the identifiers and XYZ positions of all the objects that are
     present within both of the stereo frames.
     """
-    foundObjects: List[str] = [*posXYZ.keys()]
+
+    #foundObjects: List[str] = [*posXYZ.keys()]
     # obtaining the keys for the objects which we have XYZ positions for
-    for o in foundObjects:
+    for o in [*posXYZ.keys()]:
         objectPositions[o].append(posXYZ[o])
         # and we append them to the list of all positions for that object.
 
@@ -818,6 +929,16 @@ for frame in range(0, nframes):
 # get normalized distances between each of the points for each object
 # if all identical: straight line
 # if not all identical: alien
+
+ufoList: List[str] = []
+""" A list to hold all the UFOs """
+
+for k in [*objectPositions.keys()]:
+    print(k)
+    if not isThisAStraightLine(objectPositions[k]):
+        ufoList.append(k)
+
+print(ufoList)
 
 
 print("TODO remove this print statement")
