@@ -253,12 +253,38 @@ def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
     """
     Returns the midpoint of the region of 1s in the given binary image array
 
+    If there is no region of 1s, we return (-1,-1). If there's a 1 on the
+    boundary of the image, once again, we return (-1,-1), because we'll know
+    that the midpoint we find will probably be inaccurate.
+
+    This estimates the midpoint by finding the upper/lower X and Y bounds of
+    that region of 1s in the image. Yes, it's a pretty naiive, brute force-y
+    method. However, I tried several object/blob detection algorithms within
+    OpenCV, however, none of them really worked as intended (not detecting the
+    objects in the earlier images, not really being able to work out which
+    keypoints correspond to each object, and refusing to detect the single
+    object when I go through the effort of masking out everything else in the
+    image), so I went 'fuck it, guess I'm doing it myself'
+
     :param objectMask: binary image, with 1s in the area where the object
      with the midpoint being looked for is, and 0s everywhere else.
     :return: A tuple holding the the midpoint of the object.
      If the object isn't present (mask all 0s), a value of (-1,-1) is returned.
+     Additionally, if the object is at the edge of the image (a minimum is 0,
+     or a maximum is at the maximum possible x/y), that heavily implies that
+     the object is partially out-of-frame. Therefore, as that means the true
+     bounds are likely to be out-of-frame, this midpoint detector will not find
+     the true midpoint of the object, so it will give up and return -1s for that
+     as well.
     """
-    if not objectMask.any():
+
+    if objectMask.any():
+        if objectMask[0].any() or objectMask[-1].any():
+            # if there's anything in the topmost or bottommost row, that means
+            # there's something on the image boundary, meaning that the midpoint
+            # found will be inaccurate, so we're not going to bother finding it.
+            return -1, -1
+    else:
         # if nothing in the objectMask is a 1, we return -1s.
         return -1, -1
 
@@ -277,12 +303,13 @@ def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
 
     # now we just casually loop through the image pixels,
     # and find out about what sort of shape the object has
-    for y in range(0, ny):
+    for y in range(1, ny-1):
+        # we already established that the topmost/bottommost rows are empty.
         if not objectMask[y].any():
             # we skip this row if there's no 1s in it. you are welcome.
             continue
         for x in range(0, nx):
-            if objectMask[y][x] != 0:
+            if objectMask[y][x] != 0: # if it's not 0, we've found it.
                 if notFoundFirst:
                     notFoundFirst = False
                     minX = maxX = x
@@ -296,6 +323,12 @@ def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
                     # y wont get smaller.
                     # and assignment has same complexity as checking a single
                     # condition so I may as well just reassign y anyway.
+
+    # if it's at the x bounds of the image, the result definitely won't be
+    # accurate, so we'll just return -1, -1.
+    # (we already checked the y bounds earlier on)
+    if (minX == 0) or (maxX == nx-1):
+        return -1, -1
 
     # working out widths and heights
     w: int = (maxX - minX)
@@ -442,6 +475,7 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
                     (rawL[0] - halfX, halfY - rawL[1]),
                     (rawR[0] - halfX, halfY - rawR[1])
                 )
+
     # and now return the posDict
     return posDict
 
@@ -529,6 +563,10 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
         xDisparity: float = currentPos[0][0] - currentPos[1][0]
         """ x disparity = xL - xR """
 
+        #print(currentPos[0][0])
+        #print(currentPos[1][0])
+        #print(xDisparity)
+
         rawZ: float = (focalLength * baseline) / (xDisparity * pixelSize)
         """
         Z = (f * b) / (xl - xr)
@@ -588,7 +626,51 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
     return posXYZ
 
 
+def getNormDifferenceBetweenPoints(fromPoint: Tuple[float, float, float],
+                                   toPoint: Tuple[float, float, float]) -> \
+    Tuple[float, float, float]:
+    """
+    This will get the normalized difference between two points in 3D space.
 
+    >>> getNormDifferenceBetweenPoints((0,0,0),(1,1,1))
+    (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
+
+    >>> getNormDifferenceBetweenPoints((0,0,0),(2,2,2))
+    (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
+
+    >>> getNormDifferenceBetweenPoints((0,0,0),(1,1.5,2))
+    (0.3713906763541037, 0.5570860145311556, 0.7427813527082074)
+
+    >>> getNormDifferenceBetweenPoints((1,1,1),(1,1,1))
+    (0, 0, 0)
+
+    :param fromPoint: x,y,z coordinates of the point we're coming from
+    :param toPoint: x,y,z coordinates of the point we're going to
+    :return: a normalized x,y,z vector of the distance between the points
+    """
+
+    # we find the raw x, y, and z differences between the points.
+    # this is basically a polar vector from fromPoint to toPoint.
+    xDiff: float = toPoint[0] - fromPoint[0]
+    yDiff: float = toPoint[1] - fromPoint[1]
+    zDiff: float = toPoint[2] - fromPoint[2]
+
+    dist: float = sqrt((xDiff ** 2) + (yDiff ** 2) + (zDiff ** 2))
+    """
+    The magnitude of the difference polar vector
+    dist between 2 3D points:
+        sqrt( ((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
+            and we know that x1,y1,z1 = 0 already
+                (because that's how polar vectors work)
+            so we just square, add, and root xDiff, yDiff, and zDiff.
+    """
+
+    if dist == 0:
+        # if distance is actually 0 (somehow), we just return a 0,0,0 vector
+        return 0, 0, 0
+    else:
+        # if distance isn't 0, we return the differences over the distance
+        return xDiff/dist, yDiff/dist, zDiff/dist
 
 
 def checkIfImageWasOpened(filename: str, img: Union[np.ndarray, None]) -> None:
@@ -631,7 +713,6 @@ def checkIfImageWasOpened(filename: str, img: Union[np.ndarray, None]) -> None:
         print("ERROR: Could not open the file called " + filename)
         sys.exit(1)
 
-
 """
 -- THE MAIN PROGRAM --
 
@@ -651,12 +732,26 @@ if len(sys.argv) < 4:
 # reads the 1st actual command line argument as the count of frames to look at
 nframes: int = int(sys.argv[1])
 
-#frames: List[FramePosData] = []
+objectIdentifiers: List[str] = \
+        ["cyan", "red", "white", "blue", "green", "yellow", "orange"]
+"""
+This is a list with all the object names in it.
 """
 
+objectPositions: Dict[str, List[Tuple[float, float, float, bool]]] = {
+    "cyan": [],
+    "red": [],
+    "white": [],
+    "blue": [],
+    "green": [],
+    "yellow": [],
+    "orange": []
+}
 """
-
-print("frame identity distance")  # header for the required frame data info.
+This is a dictionary which will hold the positions of the objects for every
+frame.
+"""
+print("frame  identity  distance")  # header for the required frame data info.
 
 for frame in range(0, nframes):
     # we work out the filenames for the left and right images for this frame,
@@ -682,8 +777,13 @@ for frame in range(0, nframes):
         calculateAndPrintPositionsOfObjects(im_left, im_right, frame)
     """
     We obtain the identifiers and XYZ positions of all the objects that are
-    present within both 
+    present within both of the stereo frames.
     """
+    foundObjects: List[str] = [*posXYZ.keys()]
+    # obtaining the keys for the objects which we have XYZ positions for
+    for o in foundObjects:
+        objectPositions[o].append(posXYZ[o])
+        # and we append them to the list of all positions for that object.
 
 
 
@@ -713,6 +813,11 @@ for frame in range(0, nframes):
 # work out trajectory of each object.
 # I have XYZ pos of each object for each frame that they're there for,
 # I just need to use them
+
+# TODO
+# get normalized distances between each of the points for each object
+# if all identical: straight line
+# if not all identical: alien
 
 
 print("TODO remove this print statement")
