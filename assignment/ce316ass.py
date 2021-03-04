@@ -27,19 +27,47 @@ f[12m] = sqrt(640^2 + 480^2)/
 """
 
 """
---TESTING FUNCTIONS FOR TESTING THINGS OUT--
+--DEBUGGING FUNCTIONS FOR SEEING HOW THINGS WORK--
 
 You ever wanted to see what goes on under the hood with this program?
 No?
 
-Either way, here are some functions that can be used for testing.
+Either way, here are some functions that can be used for debugging.
 """
 
-testing: bool = False
+debugging: bool = False
 """
 Set this to 'True' if you want to enable these debug functions.
 Or just keep it as 'False' if you want to just run the thing.
 """
+
+
+def debug(leftFilename: str, rightFilename: str,
+          leftIm: np.ndarray, rightIm: np.ndarray, frameNum: int = 0) -> None:
+    """
+    The wrapper function for the debugging functions, called by the main program
+    if 'debug' is set to True.
+
+    :param leftFilename: filename of the left image
+    :param rightFilename: filename of the right image
+    :param leftIm: the left image, BGR format
+    :param rightIm: the right image, BGR format
+    :param frameNum: What frame this is (used for labelling the mask
+     previews). If not defined, defaults to 0.
+    :return: nothing.
+    """
+
+    # prints the filenames, to make sure they're correct
+    print(leftFilename)
+    print(rightFilename)
+
+    # shows the left and right images
+    cv2.imshow("left", leftIm)
+    cv2.imshow("right", rightIm)
+    handleShowingStuff()
+    showMasksForDebugging(leftIm, rightIm, frameNum)
+    # and then proceeds to show all the masks produced for each object in
+    # the left and the right images.
 
 
 def getObjectMasks(hsvIn: np.ndarray) -> Tuple[np.ndarray, np.ndarray,
@@ -49,19 +77,40 @@ def getObjectMasks(hsvIn: np.ndarray) -> Tuple[np.ndarray, np.ndarray,
     """
     Generates the object masks for a given HSV image.
 
+    Yes, this uses some tuples that are defined as global variables in the
+    'actually important code' section after this section of debugging code,
+    because those tuples are part of the 'actually important code'.
+    This has been done so, if this debugging code section is removed (along with
+    the one branch in the main program that may potentially call this code),
+
+    Either way, this function won't be run until after those declarations are
+    reached, so no harm no foul.
+
+    This code is explained better in the 'getObjectMidpoints' function,
+    which has code that's basically identical to this.
+
+    You're probably going to ask 'why have you duplicated the code?'
+
+    Short answer: I don't want the production code to have a dependency on
+    this debug code, and, if this debug code was to be omitted, I'd have a
+    redundant dependency in the production code.
+
     :param hsvIn: the hsv image that contains the objects
     :return: masks for each of the 7 coloured objects that are in it.
     (cyan, red, white, blue, green, yellow, orange)
     """
     cyan_mask: np.ndarray = cv2.inRange(hsvIn, min_cyan, max_cyan)
-    cyan_mask = cv2.morphologyEx(cyan_mask, cv2.MORPH_CLOSE, kernel33)
     red_mask: np.ndarray = cv2.inRange(hsvIn, min_red, max_red)
     white_mask: np.ndarray = cv2.inRange(hsvIn, min_white, max_white)
-    white_mask = cv2.subtract(white_mask, cyan_mask)
     blue_mask: np.ndarray = cv2.inRange(hsvIn, min_blue, max_blue)
     green_mask: np.ndarray = cv2.inRange(hsvIn, min_green, max_green)
     yellow_mask: np.ndarray = cv2.inRange(hsvIn, min_yellow, max_yellow)
     orange_mask: np.ndarray = cv2.inRange(hsvIn, min_orange, max_orange)
+
+    cyan_mask = cv2.morphologyEx(cyan_mask, cv2.MORPH_CLOSE, kernel33)
+
+    white_mask = cv2.subtract(white_mask, cyan_mask)
+
     orange_mask = cv2.morphologyEx(orange_mask, cv2.MORPH_CLOSE, kernel33)
 
     yellow_mask = cv2.subtract(yellow_mask, orange_mask)
@@ -78,9 +127,9 @@ def getStereoMasks(left_in: np.ndarray, right_in: np.ndarray) -> \
     :param left_in: the left image.
     :param right_in: the right image.
     :return: a list of tuples containing the masks for each of the images.
-    Tuples are in the form (left, right).
-    The list itself is in the order
-    cyan->red->white->blue->green->yellow->orange.
+     Tuples are in the form (left image mask, right image mask).
+     The list itself is in the order
+     cyan->red->white->blue->green->yellow->orange.
     """
     leftMasks = getObjectMasks(cv2.cvtColor(left_in, cv2.COLOR_BGR2HSV))
     rightMasks = getObjectMasks(cv2.cvtColor(right_in, cv2.COLOR_BGR2HSV))
@@ -92,10 +141,10 @@ def getStereoMasks(left_in: np.ndarray, right_in: np.ndarray) -> \
     return theMasks
 
 
-def showAllMasksForTesting(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
+def showMasksForDebugging(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
         None:
     """
-    This is here mostly for testing purposes, showing the masks of each image.
+    This is here mostly for debugging purposes, showing the masks of each image.
     The 'left' image will have some text on it with the colour name identifier
     of the object, as well as what number frame this is.
     Apologies in advance if the annotations overlap with the position of
@@ -111,8 +160,8 @@ def showAllMasksForTesting(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
         ["cyan", "red", "white", "blue", "green", "yellow", "orange"]
 
     i = 0
-    testMasks = getStereoMasks(i_left, i_right)
-    for m in testMasks:
+    debugMasks = getStereoMasks(i_left, i_right)
+    for m in debugMasks:
         showLeft = m[0]
         label = str(objectOrder[i]) + " " + str(f)
         print(label)
@@ -135,14 +184,15 @@ def showAllMasksForTesting(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
 
 def handleShowingStuff() -> None:
     """
-    This is here to handle actually showing stuff when testing the program.
-    Prints something to console to let me know that I need to press something,
-    handles doing the cv2.waitKey(0) call,
-    and, if I press q or escape, it will close the program.
+    This is here to handle actually showing stuff when debugging the program.
+    Prints something to console to let the user know that they need to press
+    something to continue, handles doing the cv2.waitKey(0) call (thereby
+    allowing any pending cv2.imshow()'d images to be shown), and,
+    if q or escape are pressed, the program will close.
 
     :return: nothing is returned.
     """
-    print("pls to press")
+    print("press something to continue (press q or escape to quit)")
     key = cv2.waitKey(0)
     # quit if escape (27) or q (113) are pressed
     if key == 27 or key == 113:
@@ -205,7 +255,8 @@ def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
 
     :param objectMask: binary image, with 1s in the area where the object
      with the midpoint being looked for is, and 0s everywhere else.
-    :return: A tuple holding the the midpoint of the object (-1,-1 if no object)
+    :return: A tuple holding the the midpoint of the object.
+     If the object isn't present (mask all 0s), a value of (-1,-1) is returned.
     """
     if not objectMask.any():
         # if nothing in the objectMask is a 1, we return -1s.
@@ -260,12 +311,29 @@ def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
 
 def getObjectMidpoints(hsvIn: np.ndarray) -> Dict[str, Tuple[float, float]]:
     """
-    Gets the midpoints for the objects that may be in the coloured image.
+    Gets the midpoints for the objects that may be in the given HSV image.
+    We generate masks that contain only the region of the HSV object that is
+    occupied by the pixels that make up a particular object, do a bit of cleanup
+    for the objects that have somewhat overlapping pixel values, and then
+    put those masks into getObjectMidpoint to produce a dictionary holding the
+    midpoints of each of the objects in the image.
+
+    If an object is not present in the image, its entry in the dictionary will
+    have the default value of (-1,-1) instead of an actual midpoint.
+
+    You might be wondering 'why am I making all the masks at once and then
+    finding the midpoints from them all at once instead of just making a mask,
+    getting the midpoint, and moving on to the next mask?'
+
+    Simple answer: Doing it this way allows me to do the cleanup stuff that
+    needs to be done for cyan/white/orange/yellow more effectively,
+    and it means I can declare the results dictionary as a literal and also
+    immediately return it. yay efficiency.
 
     :param hsvIn: the hsv image that contains the objects
     :return: dict with midpoints for each of the 7 coloured objects
-    that might be present in the given image.
-    Keys are (cyan, red, white, blue, green, yellow, orange)
+     that might be present in the given image. If not present, midpoint will
+     be (-1,-1). Keys are (cyan, red, white, blue, green, yellow, orange)
     """
     # generating masks for each object.
     cyan_mask: np.ndarray = cv2.inRange(hsvIn, min_cyan, max_cyan)
@@ -290,8 +358,8 @@ def getObjectMidpoints(hsvIn: np.ndarray) -> Dict[str, Tuple[float, float]]:
     # and removing the orange midpoint from some yellow
     yellow_mask = cv2.subtract(yellow_mask, orange_mask)
 
-    # now I'm making the dictionary with the midpoints of each object
-    posDict: Dict[str, Tuple[float, float]] = {
+    # finally making + returning the dict with the midpoints of each object
+    return {
         "cyan": getObjectMidpoint(cyan_mask),
         "red": getObjectMidpoint(red_mask),
         "white": getObjectMidpoint(white_mask),
@@ -300,8 +368,6 @@ def getObjectMidpoints(hsvIn: np.ndarray) -> Dict[str, Tuple[float, float]]:
         "yellow": getObjectMidpoint(yellow_mask),
         "orange": getObjectMidpoint(orange_mask)
     }
-
-    return posDict
 
 
 def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
@@ -316,11 +382,12 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
 
     :param left_in: the left input image *in colour*
     :param right_in: the right input image *in colour*
-    :return: a dictionary with the x and y positions of each of the objects
-     in each image.
+    :return: a dictionary with the names of the objects in both images as keys,
+     and a tuple, containing the  x' and y' positions of that particular object
+     in both images as the value
 
-        1st item in the tuple: (xl,y') from left image.
-        2nd item in the tuple: (xr,y') from right image.
+        1st tuple in the value tuple: (x',y') from left image.
+        2nd tuple in the value tuple: (x',y') from right image.
 
         If an object is not present in **both** images, it will **not** be
         present in the returned dictionary.
@@ -349,6 +416,13 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
 
     # obtains the keys from lDict but as a list so it can be foreach'd
     leftKeys: List[str] = [*lDict.keys()]
+    """
+    unpacking the keys/object names as a list so we can iterate through them.
+    Why do I need to do this? Because Dict.keys() returns a KeysView object,
+    which isn't iterable, and is generally awkward to work with. However,
+    putting a KeysView kv into [*kv] basically unpacks it into a list.
+    Which we can easily iterate through. So that's what happens here.
+    """
 
     # now looks through each of those keys
     for k in leftKeys:
@@ -372,130 +446,149 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
     return posDict
 
 
-class FramePosData:
+placeholderOutString: str = "{:5}  {:8}  {:8.2e}  {}"
+"""
+This is a placeholder string to be used when formatting the frame-by-frame
+printout of object data. Double space between each thing of data.
+1st value: will be the frame number. 5 width, right-aligned.
+2nd value: object identifier. 8 width, also left-aligned
+3rd value: object distance (Z pos, in metres). 8 width, in the form 1.23e+45
+
+4th value: just the raw (X,Y,Z) position of the object in 3D space (in metres),
+for sake of curiousity.
+"""
+focalLength: float = 12
+"Focal length of camera is 12m"
+baseline: float = 3500
+"baseline between cameras is 3.5km -> 3500m"
+pixelSize: float = float(1e-5)
+"pixel spacing: 10 microns -> 1e-5 metres"
+
+
+def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
+                                        rightIm: np.ndarray,
+                                        frameNum: int = 0) -> \
+        Dict[str, Tuple[float, float, float]]:
     """
-    This class basically holds positional information for the objects
-    in each frame.
+    Given a left image (BGR), a right image (BGR), and a frame number (optional)
+    , this method will print the details about the identifiers and the depths
+    (Z axis positions) of the objects in the image (formatted as per the
+    assignment brief, using the global placeholderOutString), and will return a
+    dictionary with the X, Y, and Z coordinates of the objects in the images.
+
+    Objects in only one image will be omitted. Distances will be in metres.
+
+    leftIm and rightIm must be in BGR colour, and have identical dimensions.
+
+    This will use the focalLength, baseline, and pixelSize global variables to
+    calculate the positions of the objects.
+
+    placeholderOutString, focalLength, baseline, and pixelSize are present
+    just above this function.
+
+    :param leftIm: The left stereo image to look at (BGR colour)
+    :param rightIm: The right stereo image to look at (BGR colour)
+    :param frameNum: The frame number (optional). Will only be used to prefix
+     the printout. If not supplied, 0 will be used.
+    :return: A dictionary with the identifiers of the objects identified, along
+     with their X, Y, and Z co-ordinates, relative to the midpoint between the
+     cameras.
     """
 
-    placeholderOutString: str = "{:5}  {:8}  {:8.2e}  {}"
+    imgPositions: \
+        Dict[str, Tuple[Tuple[float, float], Tuple[float, float]]] = \
+        getStereoPositions(cv2.cvtColor(leftIm, cv2.COLOR_BGR2HSV),
+                           cv2.cvtColor(rightIm, cv2.COLOR_BGR2HSV))
     """
-    This is a placeholder string to be used when formatting the frame-by-frame
-    printout of object positions.
+    These are the left and right image X'Y' coords of every object
+    in both the left and the right images.
     """
 
-    focalLength: float = 12
-    "Focal length of camera is 12m"
-    baseline: float = 3500
-    "baseline between cameras is 3.5km -> 3500m"
-    pixelSize: float = float(1e-5)
-    "pixel spacing: 10 microns -> 1e-5 metres"
+    posXYZ: Dict[str, Tuple[float, float, float]] = {}
+    """
+    this will hold the X, Y, Z coords of the objects in 3D space,
+    using the midpoint between the cameras as the origin,
+    measured in metres.
+    """
 
-    def __init__(self, frameNumber: int, left: np.ndarray, right: np.ndarray):
+    objKeys: List[str] = [*imgPositions.keys()]
+    """
+    unpacking the keys/object names as a list so we can iterate through them.
+    Why do I need to do this? Because Dict.keys() returns a KeysView object,
+    which isn't iterable, and is generally awkward to work with. However,
+    putting a KeysView kv into [*kv] basically unpacks it into a list.
+    Which we can easily iterate through. So that's what happens here.
+    """
+    for k in objKeys:
+
+        # we obtain the info about current object's 2d pos from imagePositions
+        currentPos: Tuple[Tuple[float, float], Tuple[float, float]] = \
+            imgPositions[k]
+
+        # x disparity = xl - xr
+        xDisparity: float = currentPos[0][0] - currentPos[1][0]
+        """ x disparity = xL - xR """
+
+        rawZ: float = (focalLength * baseline) / (xDisparity * pixelSize)
         """
-        Constructor for the framePosData stuff
-
-        :param frameNumber: what frame this is
-        :param left: the left image in BGR colour
-        :param right: the right image in BGR colour
+        Z = (f * b) / (xl - xr)
+        which is how we work out what dist is.
         """
-        self.frameNum: int = frameNumber
 
+        rawX: float = ((-currentPos[1][0] * pixelSize) / focalLength) * rawZ
         """
-        These are the left and right image X'Y' coords of every object
-        in both the left and the right images.
+        (-xr/f) = (X/Z), therefore (-xr/f) * Z = X
+        So I used that equation to find out what the actual X position
+        of the object is in 3D space.
         """
-        imgPositions: \
-            Dict[str, Tuple[Tuple[float, float], Tuple[float, float]]] = \
-            getStereoPositions(cv2.cvtColor(left, cv2.COLOR_BGR2HSV),
-                               cv2.cvtColor(right, cv2.COLOR_BGR2HSV))
 
+        # just obtaining the midpoint of the Ys real quick
+        yMid: float = (currentPos[0][1] + currentPos[1][1]) / 2
+
+        rawY: float = -((yMid * pixelSize) / focalLength) * rawZ
         """
-        This will hold the depths of the objects
+        (xl / f) = (B-X)/Z 
+        so, substituting the x for y
+        (y / f) = (B-Y)/Z = -Y/Z
+        and if we rearrange that so -Y is the result
+        (y/f) * Z = -Y
+        and negating that to get positive Y as the result
+        -(y/f) * Z = Y
         """
-        self.distances: Dict[str, float] = {}
 
+        # we put the raw XYZ into posXYZ
+        posXYZ[k] = (rawX, rawY, rawZ)
+
+        # now we know the position of the object, we can work out the
+        # actual 3d hypotenuse distance from the point between the cams
+        # (0,0,0) to the position of the object (rawX,rawY,rawZ)
+
+        # dist: float = sqrt((rawX ** 2) + (rawY ** 2) + (rawZ ** 2))
         """
-        this will hold the x' and y' co-ords of the objects
+        dist between 2 3D points:
+            sqrt( ((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
+                and we know that x1,y1,z1 = 0 already
+                so we just square, add, and root rawX, rawY, and rawZ.
         """
-        self.posXYZ: Dict[str, Tuple[float, float, float]] = {}
 
-        objKeys: List[str] = [*imgPositions.keys()]
-        # unpacking the keys/object names so we can iterate through them.
-        for k in objKeys:
-            # we obtain the info about current object from imagePositions
-            currentPos: Tuple[Tuple[float, float], Tuple[float, float]] = \
-                imgPositions[k]
+        # note: as we actually just need the Z depth, not the actual
+        # hypotenuse distance, the line responsible for that calculation has
+        # been commented out. However, if the actual hypotenuse distance is
+        # needed, that commented-out line can be copied and pasted elsewhere.
 
-            # x disparity = xl - xr
-            xDisparity: float = currentPos[0][0] - currentPos[1][0]
+        # Now, we just print the required info, as per the specification.
+        print(placeholderOutString.format(
+            frameNum, # what frame number this is
+            k, # identifier of this object
+            rawZ,  # we print the Z depth
+            posXYZ[k] # the XYZ pos. Not needed, but printed for transparency.
+        ))
 
-            rawZ: float = ((FramePosData.focalLength * FramePosData.baseline) /
-                           (xDisparity * FramePosData.pixelSize))
-            """
-            Z = (f * b) / (xl - xr)
-            which is how we work out what dist is.
-            """
+    # we finish by returning the posXYZ dictionary.
+    return posXYZ
 
-            rawX: float = ((-currentPos[1][0] * FramePosData.pixelSize) /
-                           FramePosData.focalLength) * rawZ
-            """
-            (-xr/f) = (X/Z), therefore (-xr/f) * Z = X
-            So I used that equation to find out what the actual X position
-            of the object is in 3D space.
-            """
 
-            # just obtaining the midpoint of the Ys real quick
-            yMid: float = (currentPos[0][1] + currentPos[1][1]) / 2
 
-            rawY: float = -((yMid * FramePosData.pixelSize) /
-                            FramePosData.focalLength) * rawZ
-            """
-            (xl / f) = (B-X)/Z 
-            so, substituting the x for y
-            (y / f) = (B-Y)/Z = -Y/Z
-            and if we rearrange that so -Y is the result
-            (y/f) * Z = -Y
-            and negating that to get positive Y as the result
-            -(y/f) * Z = Y
-            """
-
-            # we put the raw XYZ into posXYZ
-            self.posXYZ[k] = (rawX, rawY, rawZ)
-
-            # now we know the position of the object, we just work out the
-            # actual 3d hypotenuse distance from the point between the cams
-            # (0,0,0) to the position of the object (rawX,rawY,rawZ)
-
-            dist: float = sqrt((rawX ** 2) + (rawY ** 2) + (rawZ ** 2))
-            """
-            dist between 2 3D points:
-                sqrt( ((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
-                    and we know that x1,y1,z1 = 0 already
-                    so we just square, add, and root x2, y2, and z2.
-            """
-
-            # putting the raw dist value into the distances dictionary
-            self.distances[k] = dist
-
-    def printFrameData(self) -> None:
-        """
-        This will be called when printing the data for the individual frames.
-        Prints the frame number, object name, and distance of the object from
-        the origin for all the objects encountered, formatted following the
-        assignment brief. Promptly followed by the raw pos of the object.
-
-        :return: nothing.
-        """
-        keys: List[str] = [*self.distances.keys()]
-
-        for k in keys:
-            print(FramePosData.placeholderOutString.format(
-                self.frameNum,
-                k,
-                self.distances[k],
-                self.posXYZ[k]
-            ))
 
 
 def checkIfImageWasOpened(filename: str, img: Union[np.ndarray, None]) -> None:
@@ -558,12 +651,12 @@ if len(sys.argv) < 4:
 # reads the 1st actual command line argument as the count of frames to look at
 nframes: int = int(sys.argv[1])
 
-frames: List[FramePosData] = []
-"""
-A list to hold the FramePosData objects with data for each frame
+#frames: List[FramePosData] = []
 """
 
-print("frame  identity  distance")  # header for the required frame data info.
+"""
+
+print("frame identity distance")  # header for the required frame data info.
 
 for frame in range(0, nframes):
     # we work out the filenames for the left and right images for this frame,
@@ -575,29 +668,30 @@ for frame in range(0, nframes):
 
     fn_right = sys.argv[3] % frame
     im_right: np.ndarray = cv2.imread(fn_right)
-    checkIfImageWasOpened(fn_left, im_left)
+    checkIfImageWasOpened(fn_right, im_right)
 
-    if testing:
+    if debugging:
         """
         You remember those testing functions from earlier, right?
         Well, this is where they get used. If you enabled 'testing' ofc.
         """
-        print(fn_left)
-        print(fn_right)
-        cv2.imshow("left", im_left)
-        cv2.imshow("right", im_right)
-        handleShowingStuff()
-        showAllMasksForTesting(im_left, im_right, frame)
+        debug(fn_left, fn_right, im_left, im_right, frame)
         # END OF TESTING CODE
 
-    fData: FramePosData = FramePosData(frame, im_left, im_right)
-    """the FramePosData object with the frame data for this frame is made"""
+    posXYZ: Dict[str, Tuple[float, float, float]] = \
+        calculateAndPrintPositionsOfObjects(im_left, im_right, frame)
+    """
+    We obtain the identifiers and XYZ positions of all the objects that are
+    present within both 
+    """
+
+
 
     # we put it on the list with all the others
-    frames.append(fData)
+    #frames.append(fData)
 
     # and we also print the data we need to print
-    fData.printFrameData()
+    #fData.printFrameData()
 
     # TODO
     # we know background is exactly black
