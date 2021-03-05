@@ -5,7 +5,7 @@ import scipy as sp
 from scipy import ndimage as si
 import typing
 from typing import Tuple, List, Dict, Union
-from math import sqrt, isclose
+from math import sqrt, isclose, cos
 
 """
 opencv version 4.3.0
@@ -480,6 +480,133 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
     return posDict
 
 
+
+class Vector3D:
+    """
+    A class to represent a vector in 3D space
+    """
+    def __init__(self, x: float, y: float, z: float):
+        """
+        Constructs a Vector3D with the given x, y, and z coordinates
+        :param x: x coordinate
+        :param y: y coordinate
+        :param z: z coordinate
+        """
+        self.x: float = x
+        self.y: float = y
+        self.z: float = z
+
+    def magnitude(self) -> float:
+        """
+        dist between 2 3D points:
+        sqrt( ((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
+        and we know that x1,y1,z1 = 0 already (because vector comes from origin
+        0) and x2, y2, and z2 are the x, y, and z of this vector.
+
+        :return: the magnitude of this vector
+        """
+        return sqrt((self.x ** 2) + (self.y ** 2) + (self.z ** 2))
+
+    # noinspection PyUnresolvedReferences
+    def normalized(self):
+        """
+        Normalizes this Vector3D
+
+        :return: This Vector3D, but with a magnitude of 1 instead.
+        if this already had a magnitude of 0, it'll return itself as-is
+        """
+        mag: float = self.magnitude()
+        if mag > 0:
+            self.x = self.x / mag
+            self.y = self.y / mag
+            self.z = self.z / mag
+
+        return self
+
+    def subtract(self, other):
+        """
+        Subtracts the other Vector3D from this Vector3D, returning this
+        modified Vector3D.
+
+        :param other: the other Vector3D to subtract from this
+        :return: this Vector3D minus 'other'
+        """
+        self.x -= other.x
+        self.y -= other.y
+        self.z -= other.z
+        return self
+
+    # noinspection PyUnresolvedReferences
+    def dot(self, other) -> float:
+        """
+        Returns the dot product of this vector3D and the other vector3D
+        :param other: the other Vector3D this is being dot producted against
+        :return: the dot product of this and the other vector3D
+        """
+        return (self.x * other.x) + (self.y * other.y) + (self.z * other.z)
+
+    def isZero(self) -> bool:
+        """
+        Check if this vector is (0,0,0)
+        :return: Returns true if x y and z are exactly equal to 0
+        """
+        return (self.x == 0) and (self.y == 0) and (self.z == 0)
+
+    def __str__(self) -> str:
+        """
+        Outputs this as a string; as a tuple in the form (x, y, z)
+        :return: a string of the tuple (self.x, self.y, self.z)
+
+        """
+        return str((self.x, self.y, self.z))
+
+
+def normalizeVector(v: Vector3D) -> Vector3D:
+    """
+    Obtains a version of this Vector3 with the x, y, and z normalized
+
+    :return: a version of this with a magnitude of 1. However,
+    if this already had a magnitude of 0, it'll return a vector3 with
+    a value of (0,0,0)
+    """
+    return Vector3D(v.x, v.y, v.z).normalized()
+
+
+def subVector(lhs: Vector3D, rhs: Vector3D) -> Vector3D:
+    """
+    Subtracts one Vector3D from another Vector3D, without modifying the original
+    :param lhs: left hand side
+    :param rhs: right hand side vector
+    :return: Vector3D that's equal to lhs - rhs
+    """
+    return Vector3D(lhs.x, lhs.y, lhs.z).subtract(rhs)
+
+
+def normalizeVectorBetweenPoints(fromVec: Vector3D, to: Vector3D) -> Vector3D:
+    """
+    Get lhs-rhs but normalized instead (leaving lhs and rhs untouched)
+
+    >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(1,1,1))
+    Vector3D(0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
+
+    >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(2,2,2))
+    Vector3D(0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
+
+    >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(1,1.5,2))
+    Vector3D(0.3713906763541037, 0.5570860145311556, 0.7427813527082074)
+
+    >>> normalizeVectorBetweenPoints(Vector3D(1,1,1),Vector3D(1,1,1))
+    Vector3D(0, 0, 0)
+
+    :param fromVec: going from this vector
+    :param to: to this other vector
+    :return: to - fromVec but normalized
+    """
+
+    return subVector(fromVec, to).normalized()
+
+
+
 placeholderOutString: str = "{:5}  {:8}  {:8.2e}  {}"
 """
 This is a placeholder string to be used when formatting the frame-by-frame
@@ -502,13 +629,13 @@ pixelSize: float = float(1e-5)
 def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
                                         rightIm: np.ndarray,
                                         frameNum: int = 0) -> \
-        Dict[str, Tuple[float, float, float]]:
+        Dict[str, Vector3D]:
     """
     Given a left image (BGR), a right image (BGR), and a frame number (optional)
     , this method will print the details about the identifiers and the depths
     (Z axis positions) of the objects in the image (formatted as per the
     assignment brief, using the global placeholderOutString), and will return a
-    dictionary with the X, Y, and Z coordinates of the objects in the images.
+    dictionary with vector3 positions of the objects in the images.
 
     Objects in only one image will be omitted. Distances will be in metres.
 
@@ -525,8 +652,8 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
     :param frameNum: The frame number (optional). Will only be used to prefix
      the printout. If not supplied, 0 will be used.
     :return: A dictionary with the identifiers of the objects identified, along
-     with their X, Y, and Z co-ordinates, relative to the midpoint between the
-     cameras.
+     with their vector3 positions, in metres, relative to the midpoint between
+     the cameras.
     """
 
     imgPositions: \
@@ -538,7 +665,7 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
     in both the left and the right images.
     """
 
-    posXYZ: Dict[str, Tuple[float, float, float]] = {}
+    posXYZ: Dict[str, Vector3D] = {}
     """
     this will hold the X, Y, Z coords of the objects in 3D space,
     using the midpoint between the cameras as the origin,
@@ -595,115 +722,22 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
         """
 
         # we put the raw XYZ into posXYZ
-        posXYZ[k] = (rawX, rawY, rawZ)
-
-        # now we know the position of the object, we can work out the
-        # actual 3d hypotenuse distance from the point between the cams
-        # (0,0,0) to the position of the object (rawX,rawY,rawZ)
-
-        # dist: float = sqrt((rawX ** 2) + (rawY ** 2) + (rawZ ** 2))
-        """
-        dist between 2 3D points:
-            sqrt( ((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
-                and we know that x1,y1,z1 = 0 already
-                so we just square, add, and root rawX, rawY, and rawZ.
-        """
-
-        # note: as we actually just need the Z depth, not the actual
-        # hypotenuse distance, the line responsible for that calculation has
-        # been commented out. However, if the actual hypotenuse distance is
-        # needed, that commented-out line can be copied and pasted elsewhere.
+        posXYZ[k] = Vector3D(rawX, rawY, rawZ)
 
         # Now, we just print the required info, as per the specification.
         print(placeholderOutString.format(
-            frameNum, # what frame number this is
-            k, # identifier of this object
+            frameNum,  # what frame number this is
+            k,  # identifier of this object
             rawZ,  # we print the Z depth
-            posXYZ[k] # the XYZ pos. Not needed, but printed for transparency.
+            posXYZ[k]  # the XYZ pos. Not needed, but printed for transparency.
         ))
 
     # we finish by returning the posXYZ dictionary.
     return posXYZ
 
 
-def normalizeVector(v: Tuple[float, float, float]) -> \
-        Tuple[float, float, float]:
-    """
-    Normalizes a given 3D vector v
-    :param v: the vector to normalize (as a tuple of floats)
-    :return: that vector but normalized
-    """
-    mag: float = sqrt((v[0] ** 2) + (v[1] ** 2) + (v[2] ** 2))
-    """
-    The magnitude of the 3d vector
-    dist between 2 3D points:
-        sqrt( ((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
-            and we know that x1,y1,z1 = 0 already
-                (because that's how polar vectors work)
-            so we just square, add, and root v[0], v[1], and v[2].
-    """
-    if mag == 0:
-        return 0, 0, 0
-    else:
-        return v[0]/mag, v[1]/mag, v[2]/mag
 
-def getNormVectorBetweenPoints(fromPoint: Tuple[float, float, float],
-                               toPoint: Tuple[float, float, float],
-                               rounding: int = 0) -> \
-    Tuple[float, float, float]:
-    """
-    This will get the normalized vector between two points in 3D space, rounded
-    to the given 'rounding' decimal places (unrounded if 0 is provided)
-
-    >>> getNormVectorBetweenPoints((0,0,0),(1,1,1))
-    (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
-
-    >>> getNormVectorBetweenPoints((0,0,0),(2,2,2))
-    (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
-
-    >>> getNormVectorBetweenPoints((0,0,0),(1,1.5,2))
-    (0.3713906763541037, 0.5570860145311556, 0.7427813527082074)
-
-    >>> getNormVectorBetweenPoints((1,1,1),(1,1,1))
-    (0, 0, 0)
-
-    :param fromPoint: x,y,z coordinates of the point we're coming from
-    :param toPoint: x,y,z coordinates of the point we're going to
-    :return: a normalized x,y,z vector of the distance between the points
-    """
-
-    # we find the raw x, y, and z differences between the points.
-    # this is basically a polar vector from fromPoint to toPoint.
-    xDiff: float = toPoint[0] - fromPoint[0]
-    yDiff: float = toPoint[1] - fromPoint[1]
-    zDiff: float = toPoint[2] - fromPoint[2]
-
-    dist: float = sqrt((xDiff ** 2) + (yDiff ** 2) + (zDiff ** 2))
-    """
-    The magnitude of the difference polar vector
-    dist between 2 3D points:
-        sqrt( ((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
-            and we know that x1,y1,z1 = 0 already
-                (because that's how polar vectors work)
-            so we just square, add, and root xDiff, yDiff, and zDiff.
-    """
-
-    if dist == 0:
-        # if distance is actually 0 (somehow), we just return a 0,0,0 vector
-        return 0, 0, 0
-    else:
-        # if distance isn't 0, we return the differences over the distance
-        if rounding == 0:
-            return xDiff / dist, yDiff / dist, zDiff / dist
-        else:
-            if rounding < 0:
-                rounding = abs(rounding)
-            return round(xDiff / dist, rounding),\
-                   round(yDiff / dist, rounding),\
-                   round(zDiff / dist, rounding)
-
-
-def isThisAStraightLine(line: List[Tuple[float, float, float]]) -> bool:
+def isThisAStraightLine(line: List[Vector3D]) -> bool:
     """
     Returns whether or not a sequence of 3D points is a straight line,
     using the getNormDifferenceBetweenPoints function.
@@ -712,8 +746,11 @@ def isThisAStraightLine(line: List[Tuple[float, float, float]]) -> bool:
     true. Otherwise, it'll return true if all the points have an identical
     normalized vector between them, false otherwise.
 
+    Due to the inherent uncertainty with how the points are calculated, I am
+    giving some leeway in the calculations.
+
     :param line: the sequence of 3D points
-    :return: true if they're a straight line, false otherwise.
+    :return: true if they're a straight enough line, false otherwise.
     """
 
     if len(line) < 3:
@@ -722,38 +759,21 @@ def isThisAStraightLine(line: List[Tuple[float, float, float]]) -> bool:
     thisIndex: int = 1
     """ A cursor to the index of the line used for this iteration """
 
-    normDiff: Tuple[float, float, float] = \
-        getNormVectorBetweenPoints(line[0], line[1])
-    """ the normalized difference between points 0 and 1 """
+    startEndDiff: Vector3D = \
+        normalizeVectorBetweenPoints(line[0], line[-1])
 
-    lastDiff: Tuple[float, float, float] = normDiff
+    # TODO
+    # make list of all the normalized dot values (omitting vectors of zero)
+    # then analyse if it's sus?
 
-    totalDiff: List[float, float, float] = [0, 0, 0]
+    print(startEndDiff)
 
-    print(normDiff)
 
     susCount: int = 0
 
     maxSus: int = int(len(line)/8)
 
-    for i in range(1, len(line)):
-        thisDiff: Tuple[float, float, float] = \
-            getNormVectorBetweenPoints(line[i-1], line[i])
-        totalDiff[0] = (totalDiff[0] + thisDiff[0])/2
-        totalDiff[1] = (totalDiff[1] + thisDiff[1])/2
-        totalDiff[2] = (totalDiff[2] + thisDiff[2])/2
-
-    print(totalDiff)
-
-    avgDiff: Tuple[float, float, float] = normalizeVector(
-        (totalDiff[0], totalDiff[1], totalDiff[2]))
-
-    totalDiff[0] = totalDiff[0] / (len(line) - 1)
-    totalDiff[1] = totalDiff[1] / (len(line) - 1)
-    totalDiff[2] = totalDiff[2] / (len(line) - 1)
-
-    print(avgDiff)
-    print("")
+    print("imposter is " + str(maxSus) + " sus!")
 
     while True:
         thisIndex += 1 #we move to the next index of the list
@@ -763,18 +783,23 @@ def isThisAStraightLine(line: List[Tuple[float, float, float]]) -> bool:
             # and if the program hasn't failed yet, this succeeded.
             return True
 
-        thisDiff = \
-            getNormVectorBetweenPoints(line[thisIndex-1], line[thisIndex])
+        thisDiff: Vector3D = \
+            normalizeVectorBetweenPoints(line[thisIndex-1], line[thisIndex])
 
         print(thisDiff)
+
+        if thisDiff.isZero():
+            continue
+
+        thisDot: float = startEndDiff.dot(thisDiff)
+
+        print(thisDot)
 
         # if the normalized difference between the previous index and this index
         # is not identical to the original normalized difference
         # if getNormVectorBetweenPoints(line[thisIndex-1], line[thisIndex]) != \
         #    normDiff:
-        if not (isclose(avgDiff[0], thisDiff[0]) or
-                isclose(avgDiff[1], thisDiff[1]) or
-                isclose(avgDiff[2], thisDiff[2])):
+        if not (isclose(thisDot, 1.0)):
             susCount += 1
             if susCount == maxSus:
                 print("Failed at frame " + str(thisIndex))
@@ -848,7 +873,7 @@ if len(sys.argv) < 4:
 nframes: int = int(sys.argv[1])
 
 
-objectPositions: Dict[str, List[Tuple[float, float, float]]] = {
+objectPositions: Dict[str, List[Vector3D]] = {
     "cyan": [],
     "red": [],
     "white": [],
@@ -883,7 +908,7 @@ for frame in range(0, nframes):
         debug(fn_left, fn_right, im_left, im_right, frame)
         # END OF TESTING CODE
 
-    posXYZ: Dict[str, Tuple[float, float, float]] = \
+    posXYZ: Dict[str, Vector3D] = \
         calculateAndPrintPositionsOfObjects(im_left, im_right, frame)
     """
     We obtain the identifiers and XYZ positions of all the objects that are
