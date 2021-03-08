@@ -1,30 +1,77 @@
+"""
+---
+**ce316ass.py**
+---
+
+
+
+PURPOSE:
+
+Given:
+
+* A number of frames to look at
+* A placeholder for filenames for left/right images
+    * such as left-%03d.png and right-%03d.png
+* Image files in the same directory as this file with filenames that conform
+  to the aforementioned template
+
+This will:
+
+* Identify objects identified in the images
+    * Assumptions
+        * Assumes that the objects have these HSV values
+            * Cyan
+                * Hue 180
+            * Red
+                * Hue 0
+                * Saturation of at least 1/256
+            * White
+                * Hue 0
+                * Saturation 0
+                * Value of at least 1/256 (and not in 'cyan')
+            * Blue
+                * Hue 240
+                * Saturation of at least 1/256
+                * Value of at least 1/256
+            * Green
+                * Hue 120
+                * Saturation of at least 1/256
+                * Value of at least 1/256
+            * Yellow
+                * Hue 60 (and not in 'orange')
+                * Saturation of at least 1/256
+            * Orange
+                * Hue 40-58
+        * Assumes is only one object of the given colour in the image
+        * Assumes that the objects are not overlapping
+    * Limitations
+        * If any object is at the boundary of the image, it will be rejected.
+            * This is because, if it's at the boundary, the midpoint calculated
+              is likely to be *very* inaccurate.
+* For each of the objects identified in every frame
+    * Print their distance (in terms of Z depth) from the cameras, in metres.
+        * Along with their full X, Y, Z position from the cameras
+    * Assuming
+        * X baseline of 3500 metres
+        * Y baseline of 0
+        * Focal length of 12 metres
+        * Pixel spacing of 10 microns
+    * Limitations
+        * If an object is not present in both images, it shall be ignored, due
+          to not having full information about the x disparity for that frame.
+        * If an object is at the edge of an image, it will also be ignored, due
+          to the lack of accurate information
+
+
+"""
+
+
+
 import sys
 import cv2
 import numpy as np
-import scipy as sp
-from scipy import ndimage as si
-import typing
 from typing import Tuple, List, Dict, Union
-from math import sqrt, isclose, cos
-
-"""
-opencv version 4.3.0
-
-cam info:
-    focal length: 12m
-    dist (baseline): 3500m
-    pixel spacing: 10 microns = 1*10e-5m =  0.00001m
-        scale in radians: ps/focal
-            1/1200000 = (8.33r*10e-7)
-            radians -> arc = (180/pi) * 3600
-            0.1718873385 micron scale
-        scale in m: 1.718873385*10e-7
-    680 * 480 img
-    
-depth = f m b/disparity
-
-f[12m] = sqrt(640^2 + 480^2)/
-"""
+from math import sqrt, isclose
 
 """
 --DEBUGGING FUNCTIONS FOR SEEING HOW THINGS WORK--
@@ -33,6 +80,8 @@ You ever wanted to see what goes on under the hood with this program?
 No?
 
 Either way, here are some functions that can be used for debugging.
+
+Some code later on does have inbuilt debugging functions.
 """
 
 debugging: bool = False
@@ -159,11 +208,14 @@ def showMasksForDebugging(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
     objectOrder: List[str] = \
         ["cyan", "red", "white", "blue", "green", "yellow", "orange"]
 
-    i = 0
-    debugMasks = getStereoMasks(i_left, i_right)
+    magenta: Tuple[int, int, int] = (255, 0, 255)
+
+    i: int = 0
+    debugMasks: List[Tuple[np.ndarray, np.ndarray]] =\
+        getStereoMasks(i_left, i_right)
     for m in debugMasks:
-        showLeft = m[0]
-        label = str(objectOrder[i]) + " " + str(f)
+        showLeft: np.ndarray = np.ndarray.copy(m[0])
+        label: str = str(objectOrder[i]) + " " + str(f)
         print(label)
         cv2.putText(showLeft, label, (50, 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, 255, 2, cv2.LINE_AA)
@@ -171,11 +223,23 @@ def showMasksForDebugging(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
         cv2.imshow("right", m[1])
         handleShowingStuff()
 
-        showLeft = cv2.bitwise_and(i_left, i_left, mask=m[0])
-        showRight = cv2.bitwise_and(i_right, i_right, mask=m[1])
+        leftMid: Tuple[float, float] = getObjectMidpoint(m[0])
+        rightMid: Tuple[float, float] = getObjectMidpoint(m[1])
+
+        print(leftMid)
+        print(rightMid)
+
+        showLeft: np.ndarray = cv2.bitwise_and(i_left, i_left, mask=m[0])
+        showRight: np.ndarray = cv2.bitwise_and(i_right, i_right, mask=m[1])
         cv2.putText(showLeft, label, (50, 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2,
                     cv2.LINE_AA)
+        if leftMid != (-1, -1):
+            iLeftMid: Tuple[int, int] = (int(leftMid[0]), int(leftMid[1]))
+            cv2.line(showLeft, iLeftMid, iLeftMid, magenta, 1)
+        if rightMid != (-1, -1):
+            iRightMid: Tuple[int, int] = (int(rightMid[0]), int(rightMid[1]))
+            cv2.line(showRight, iRightMid, iRightMid, magenta, 1)
         cv2.imshow("left", showLeft)
         cv2.imshow("right", showRight)
         handleShowingStuff()
@@ -432,8 +496,6 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
         # complains if the dimensions aren't identical.
         raise ValueError("Please provide images with identical shapes.")
 
-    # gets midpoints for all the objects in each image.
-
     lDict: Dict[str, Tuple[float, float]] = getObjectMidpoints(left_in)
     """dictionary with midpoints for every object in the left image"""
 
@@ -447,31 +509,22 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
     posDict: Dict[str, Tuple[Tuple[float, float], Tuple[float, float]]] = {}
     """a dictionary for all the calculated (X',Y') positions for each image"""
 
-    # obtains the keys from lDict but as a list so it can be foreach'd
-    leftKeys: List[str] = [*lDict.keys()]
-    """
-    unpacking the keys/object names as a list so we can iterate through them.
-    Why do I need to do this? Because Dict.keys() returns a KeysView object,
-    which isn't iterable, and is generally awkward to work with. However,
-    putting a KeysView kv into [*kv] basically unpacks it into a list.
-    Which we can easily iterate through. So that's what happens here.
-    """
-
-    # now looks through each of those keys
-    for k in leftKeys:
-        if lDict[k] != (-1, -1):
-            if rDict[k] != (-1, -1):
+    # obtains the keys from lDict but as a list so it can be foreach'd,
+    # and also foreaches through them
+    for key in [*lDict.keys()]:
+        if lDict[key] != (-1, -1):
+            if rDict[key] != (-1, -1):
                 # if both dictionaries have an actual value for the key
 
                 # just getting a copy of those raw values real quick
-                rawL: Tuple[float, float] = lDict[k]
-                rawR: Tuple[float, float] = rDict[k]
+                rawL: Tuple[float, float] = lDict[key]
+                rawR: Tuple[float, float] = rDict[key]
 
                 # work out the X' and the Y' stuff for left and right
                 # and put it into the posDict.
                 #   X` = x - halfX
                 #   Y' = halfY - y
-                posDict[k] = (
+                posDict[key] = (
                     (rawL[0] - halfX, halfY - rawL[1]),
                     (rawR[0] - halfX, halfY - rawR[1])
                 )
@@ -480,10 +533,20 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
     return posDict
 
 
-
 class Vector3D:
     """
-    A class to represent a vector in 3D space
+    A class to represent a vector in 3D space.
+    This code was written by myself, but I fully acknowledge that somebody else
+    has probably written a python implementation of a 3D vector before, so any
+    relationship between this Vector3D and another implementation of Vector3D
+    is entirely coincidental.
+
+    This implementation just contains a normalize, subtract, isZero, dot product
+    , and __str__ method (as well as a constructor ofc), because that's all
+    the math stuff I needed for this particular use case.
+
+    References for particular sources for math stuff (when used) have been given
+    in the methods for each of the functions that use the math stuff.
     """
     def __init__(self, x: float, y: float, z: float):
         """
@@ -499,9 +562,11 @@ class Vector3D:
     def magnitude(self) -> float:
         """
         dist between 2 3D points:
-        sqrt( ((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
+        sqrt(((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
         and we know that x1,y1,z1 = 0 already (because vector comes from origin
         0) and x2, y2, and z2 are the x, y, and z of this vector.
+
+        Got the maths from https://www.calculator.net/distance-calculator.html
 
         :return: the magnitude of this vector
         """
@@ -510,10 +575,13 @@ class Vector3D:
     # noinspection PyUnresolvedReferences
     def normalized(self):
         """
-        Normalizes this Vector3D
+        Normalizes this Vector3D (makes the magnitude 1 by
 
         :return: This Vector3D, but with a magnitude of 1 instead.
-        if this already had a magnitude of 0, it'll return itself as-is
+         if this already had a magnitude of 0, it'll return itself as-is.
+
+         Would have type-annotated the return type as Vector3D but Python didn't
+         really like that.
         """
         mag: float = self.magnitude()
         if mag > 0:
@@ -528,8 +596,13 @@ class Vector3D:
         Subtracts the other Vector3D from this Vector3D, returning this
         modified Vector3D.
 
-        :param other: the other Vector3D to subtract from this
-        :return: this Vector3D minus 'other'
+        Didn't need to get the maths from anywhere because subtraction is pretty
+        darn simple and doesn't have any weirdness.
+
+        :param other: the other Vector3D to subtract from this. Would have type-
+         annotated this argument as Vector3D, but python didn't like that.
+        :return: this Vector3D minus 'other'. Would have type-annotated the
+         return type as Vector3D, but python didn't like that.
         """
         self.x -= other.x
         self.y -= other.y
@@ -539,8 +612,13 @@ class Vector3D:
     # noinspection PyUnresolvedReferences
     def dot(self, other) -> float:
         """
-        Returns the dot product of this vector3D and the other vector3D
-        :param other: the other Vector3D this is being dot producted against
+        Returns the dot product of this Vector3D and the other Vector3D.
+
+        Got the maths from https://www.quantumstudy.com/physics/vectors-2/
+
+        :param other: the other Vector3D this is being dot product-ed against.
+         Would have type-annotated this argument as Vector3D, but python didn't
+         like that.
         :return: the dot product of this and the other vector3D
         """
         return (self.x * other.x) + (self.y * other.y) + (self.z * other.z)
@@ -548,7 +626,7 @@ class Vector3D:
     def isZero(self) -> bool:
         """
         Check if this vector is (0,0,0)
-        :return: Returns true if x y and z are exactly equal to 0
+        :return: Returns true if x, y and z are exactly equal to 0
         """
         return (self.x == 0) and (self.y == 0) and (self.z == 0)
 
@@ -587,16 +665,16 @@ def normalizeVectorBetweenPoints(fromVec: Vector3D, to: Vector3D) -> Vector3D:
     Get lhs-rhs but normalized instead (leaving lhs and rhs untouched)
 
     >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(1,1,1))
-    Vector3D(0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
+    (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
 
     >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(2,2,2))
-    Vector3D(0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
+    (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
 
     >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(1,1.5,2))
-    Vector3D(0.3713906763541037, 0.5570860145311556, 0.7427813527082074)
+    (0.3713906763541037, 0.5570860145311556, 0.7427813527082074)
 
     >>> normalizeVectorBetweenPoints(Vector3D(1,1,1),Vector3D(1,1,1))
-    Vector3D(0, 0, 0)
+    (0, 0, 0)
 
     :param fromVec: going from this vector
     :param to: to this other vector
@@ -616,7 +694,7 @@ printout of object data. Double space between each thing of data.
 3rd value: object distance (Z pos, in metres). 8 width, in the form 1.23e+45
 
 4th value: just the raw (X,Y,Z) position of the object in 3D space (in metres),
-for sake of curiousity.
+for sake of curiosity.
 """
 focalLength: float = 12
 "Focal length of camera is 12m"
@@ -672,27 +750,19 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
     measured in metres.
     """
 
-    objKeys: List[str] = [*imgPositions.keys()]
-    """
-    unpacking the keys/object names as a list so we can iterate through them.
-    Why do I need to do this? Because Dict.keys() returns a KeysView object,
-    which isn't iterable, and is generally awkward to work with. However,
-    putting a KeysView kv into [*kv] basically unpacks it into a list.
-    Which we can easily iterate through. So that's what happens here.
-    """
-    for k in objKeys:
+    # unpacking the keys/object names as a list so we can iterate through them.
+    # Why do I need to do this? Because Dict.keys() returns a KeysView object,
+    # which isn't iterable, and is generally awkward to work with. However,
+    # putting a KeysView kv into [*kv] basically unpacks it into a list, which
+    # we can iterate through. So that's what happens here.
+    for key in [*imgPositions.keys()]:
 
-        # we obtain the info about current object's 2d pos from imagePositions
         currentPos: Tuple[Tuple[float, float], Tuple[float, float]] = \
-            imgPositions[k]
+            imgPositions[key]
+        "We obtain info about current object's 2d pos from imagePositions"
 
-        # x disparity = xl - xr
         xDisparity: float = currentPos[0][0] - currentPos[1][0]
-        """ x disparity = xL - xR """
-
-        #print(currentPos[0][0])
-        #print(currentPos[1][0])
-        #print(xDisparity)
+        "x disparity = xL - xR"
 
         rawZ: float = (focalLength * baseline) / (xDisparity * pixelSize)
         """
@@ -707,8 +777,12 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
         of the object is in 3D space.
         """
 
-        # just obtaining the midpoint of the Ys real quick
         yMid: float = (currentPos[0][1] + currentPos[1][1]) / 2
+        """
+        This is the y midpoint of the object. I'm getting the average of the y
+        position for the two images, just in case they differ a bit (and, if
+        they're actually identical, the yMid will just be the same as them)
+        """
 
         rawY: float = -((yMid * pixelSize) / focalLength) * rawZ
         """
@@ -722,95 +796,209 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
         """
 
         # we put the raw XYZ into posXYZ
-        posXYZ[k] = Vector3D(rawX, rawY, rawZ)
+        posXYZ[key] = Vector3D(rawX, rawY, rawZ)
 
         # Now, we just print the required info, as per the specification.
         print(placeholderOutString.format(
             frameNum,  # what frame number this is
-            k,  # identifier of this object
+            key,  # identifier of this object
             rawZ,  # we print the Z depth
-            posXYZ[k]  # the XYZ pos. Not needed, but printed for transparency.
+            posXYZ[key]  # the XYZ pos, printed for debug reasons.
         ))
 
     # we finish by returning the posXYZ dictionary.
     return posXYZ
 
 
+debuggingLineStuff: bool = False
+"""
+Set this to true if you want to enable the debug printouts for the 
+isThisAStraightLine function (immediately below this)
+"""
+
 
 def isThisAStraightLine(line: List[Vector3D]) -> bool:
     """
     Returns whether or not a sequence of 3D points is a straight line,
-    using the getNormDifferenceBetweenPoints function.
+    using the getNormDifferenceBetweenPoints function, and dot product abuse.
 
     If there's 2 or fewer points, it certainly ain't bent, so it will return
-    true. Otherwise, it'll return true if all the points have an identical
-    normalized vector between them, false otherwise.
+    true.
 
     Due to the inherent uncertainty with how the points are calculated, I am
     giving some leeway in the calculations.
+
+    And basically I'm working out if it's straight or not by seeing if at least
+    ~95% of the dot products for the normalized vectors between each vector of
+    the line and the normalized vector between the start and the end of the line
+    are ~1.0 (tl;dr the dot product of two identical unit vectors is 1, but, if
+    they aren't identical, it'll be less than 1).
 
     :param line: the sequence of 3D points
     :return: true if they're a straight enough line, false otherwise.
     """
 
     if len(line) < 3:
+        # 3 short 5 bend
         return True
-
-    thisIndex: int = 1
-    """ A cursor to the index of the line used for this iteration """
 
     startEndDiff: Vector3D = \
         normalizeVectorBetweenPoints(line[0], line[-1])
+    """
+    This is a normalized vector between the starting point and the ending
+    point of the object. Every single vector between each pair of consecutive
+    points will be checked for similarity to this via their dot products
+    """
 
-    # TODO
-    # make list of all the normalized dot values (omitting vectors of zero)
-    # then analyse if it's sus?
+    if debuggingLineStuff:
+        print(startEndDiff)
 
-    print(startEndDiff)
+    dots: List[float] = []
+    """
+    A list to hold the dot product(s) of startEndDiff and the normalized
+    versions of the vectors between each pair of consecutive vectors in line
+    """
 
-
-    susCount: int = 0
-
-    maxSus: int = int(len(line)/8)
-
-    print("imposter is " + str(maxSus) + " sus!")
+    thisIndex: int = 0
+    """
+    A cursor to the index of the line used for this iteration. This starts at 0,
+    so, when the first iteration increments it to 1, the first iteration will
+    look at indexes [0] and [1] (getting the first movement vector).
+    """
 
     while True:
-        thisIndex += 1 #we move to the next index of the list
-        if thisIndex == len(line):
+        thisIndex += 1 # we move to the next index of the list
+        if thisIndex >= len(line):
             # we're basically emulating a do/while loop here
             # with a while condition of thisIndex < len(line)
-            # and if the program hasn't failed yet, this succeeded.
-            return True
+            # so when we get to the last index, we finish the loop
+            break
 
         thisDiff: Vector3D = \
             normalizeVectorBetweenPoints(line[thisIndex-1], line[thisIndex])
+        """
+        We find the vector between the position at the index  thisIndex and the
+        point on the line behind it, but normalized instead, so we can compare
+        it to the normalized startEndDiff.
+        """
 
-        print(thisDiff)
+        if debuggingLineStuff:
+            print(thisDiff)
 
         if thisDiff.isZero():
+            # if it's a 0 vector, that will mess up our calculations, so
+            # we'll just ignore it and move on to the next pair of vectors.
             continue
 
         thisDot: float = startEndDiff.dot(thisDiff)
+        """
+        TIME FOR SOME ILLEGAL MATHS!!!
+        
+        Funnily enough, you can actually use the dot product of two unit vectors
+        to compare the unit vectors for similarity.
+        
+        Unit vectors have a magnitude of 1. And the dot product of two vectors
+        is basically working out how far a vector projects onto another. Forgot
+        the technical terms.
+        
+        But, the important thing is that if you have two unit vectors, and the
+        two unit vectors are identical (same x, y, z; same direction), the dot
+        product of those two vectors will be 1.
+        
+        For a more practical example of this illegal maths in action,
+        there's a rather nice demo of the dot products of vectors (but in two
+        dimensions) here, where you can try messing around with unit vectors:
+    https://www.youphysics.education/scalar-and-vector-quantities/dot-product/
+        """
 
-        print(thisDot)
+        if debuggingLineStuff:
+            print(thisDot)
 
-        # if the normalized difference between the previous index and this index
-        # is not identical to the original normalized difference
-        # if getNormVectorBetweenPoints(line[thisIndex-1], line[thisIndex]) != \
-        #    normDiff:
-        if not (isclose(thisDot, 1.0)):
+        dots.append(thisDot) # and we append the current dot product to dots.
+
+    if len(dots) == 0:
+        # if all the differences between positions were (0,0,0), this ain't bent
+        # so it'll return True.
+        return True
+
+    maxSus: int = len(dots)//20
+    """
+    This is how many of the dot products have to be not roughly equal to 1 for
+    the object to be labelled as a UFO. It's currently set up so, if ~5% of the
+    dots are not equal to 1, that's sus enough for us to label it as a UFO, with
+    95% certainty of this being the case.
+    
+    This is because I'm working on the hypothesis that 'This line is straight',
+    and I'm going only going to accept this hypothesis with a certainty of at
+    least 95% (it's good enough for geography, and there's not enough data, at
+    least in the sample dataset, for me to really be able to test for 99%
+    certainty)
+    
+    So, if ~5% of the vectors indicate that this is not travelling in a straight
+    line, we have a certainty of less than 95% that this is travelling in a
+    straight line, therefore, we will reject the hypothesis that 'this object
+    is travelling in a straight line', and accept the null hypothesis (of 'this
+    object is not travelling in a straight line') instead.
+    """
+
+    if debuggingLineStuff:
+        print("imposter is " + str(maxSus) + " sus!") # WHEN THE IMPOSTER IS SUS
+
+    susCount: int = 0
+    "The count of how many times the dot product has been not equal to 1."
+
+    debugCount: int = 0
+    "just here as a printout for debug purposes."
+
+    for d in dots:
+        if not isclose(d, 1.0):
+            """
+            We're using floating-point numbers here, so, because it's nigh
+            impossible to get a dot of 1.0 (mostly due to the slight inaccuracy
+            inherent due to resolution and pixel values and stuff like that),
+            we're using the 'isclose' method to check if the dots are within
+            1e-09 of 1 (at least 0.999999999).
+            
+            If it isn't close enough to 1, the thing isn't going in
+            a straight line. So it's sus.
+            
+            And if it's sus maxSus times, this is clearly not a straight line.
+            """
             susCount += 1
-            if susCount == maxSus:
-                print("Failed at frame " + str(thisIndex))
-                return False
-            else:
-                print("Frame " + str(thisIndex) + " is sus " + str(susCount))
+            if debuggingLineStuff:
+                print("diff " + str(debugCount) + " is " +
+                      str(susCount) + " sus")
+            if susCount == maxSus: # WHEN THE IMPOSTER IS SUS
+                return False # amogus
+        debugCount += 1
 
-        #lastDiff = thisDiff
+    # if it hasn't been thrown out as sus yet, it's probably a straight line.
+    return True
 
 
+def makeUfoString(objectPositions: Dict[str, List[Vector3D]]) -> str:
+    """
+    Given the dictionary of object identifiers + lists with all of
+    their Vector3D positions, create the space delimited string with the
+    list of all the identifiers of objects that are UFOs
+    :param objectPositions: dictionary of object identifiers + Vector3D
+     positions for all the objects that may or may not be UFOs
+    :return: string with the identifiers of what is and isn't a UFO
+    """
+    ufoString: str = "UFO:"
+    """
+    The space-delimited string of UFO identifiers.
+    """
 
+    for key in [*objectPositions.keys()]:
+        if not isThisAStraightLine(objectPositions[key]):
+            # we check if the list of points is a straight line.
+            # If they aren't a straight line, we know this is a UFO, so
+            # it's appended to the ufoString.
+            ufoString = ufoString + " " + key
+
+    print(ufoString)
+    return ufoString
 
 
 def checkIfImageWasOpened(filename: str, img: Union[np.ndarray, None]) -> None:
@@ -853,24 +1041,36 @@ def checkIfImageWasOpened(filename: str, img: Union[np.ndarray, None]) -> None:
         print("ERROR: Could not open the file called " + filename)
         sys.exit(1)
 
+
 """
 -- THE MAIN PROGRAM --
 
 Everything from here is the stuff that runs when you start running this.
 """
 
+
 if len(sys.argv) < 4:
     # If you don't give 3 command line arguments, the program will complain
     print("Usage:", sys.argv[0],
           "<frame count> ",
-          "<left-hand frame filename template> ",
-          "<right-hand frame filename template>",
+          "<left frame filename template, such as left-%03d.png> ",
+          "<right frame filename template, such as right-%03d.png>",
           file=sys.stderr)
     # and promptly quit
     sys.exit(1)
 
-# reads the 1st actual command line argument as the count of frames to look at
+
+# this line was adapted from the assignment brief.
 nframes: int = int(sys.argv[1])
+"""
+Reads the 1st (well, technically 2nd) command line argument as the number of
+frames to look at.
+"""
+
+if nframes < 1:
+    # complains if it's asked to look at less than 1 frame (and gives up)
+    print("How the hell am I supposed to look at less than 1 frame!?")
+    sys.exit(1)
 
 
 objectPositions: Dict[str, List[Vector3D]] = {
@@ -886,18 +1086,22 @@ objectPositions: Dict[str, List[Vector3D]] = {
 This is a dictionary which will hold the positions of the objects for every
 frame.
 """
+
 print("frame  identity  distance")  # header for the required frame data info.
 
+# the following lines were adapted from the assignment brief.
 for frame in range(0, nframes):
     # we work out the filenames for the left and right images for this frame,
     # and then we open those images using opencv.
     # (and also check to see if the images could actually be opened.)
-    fn_left = sys.argv[2] % frame
+    fn_left: str = sys.argv[2] % frame
     im_left: np.ndarray = cv2.imread(fn_left)
+    """The left image for this frame (BGR)"""
     checkIfImageWasOpened(fn_left, im_left)
 
-    fn_right = sys.argv[3] % frame
+    fn_right: str = sys.argv[3] % frame
     im_right: np.ndarray = cv2.imread(fn_right)
+    """The right image for this frame (BGR)"""
     checkIfImageWasOpened(fn_right, im_right)
 
     if debugging:
@@ -915,55 +1119,11 @@ for frame in range(0, nframes):
     present within both of the stereo frames.
     """
 
-    #foundObjects: List[str] = [*posXYZ.keys()]
-    # obtaining the keys for the objects which we have XYZ positions for
     for o in [*posXYZ.keys()]:
         objectPositions[o].append(posXYZ[o])
         # and we append them to the list of all positions for that object.
 
+# Finally, we print out what is/isn't a UFO.
+makeUfoString(objectPositions)
 
 
-    # we put it on the list with all the others
-    #frames.append(fData)
-
-    # and we also print the data we need to print
-    #fData.printFrameData()
-
-    # TODO
-    # we know background is exactly black
-    # each object is a different colour
-    # if spot the red one in the left,
-    #   know that the red one in the right is the same
-    #   look for leftmost, rightmost, highest,
-    #   and lowest pixel that is red?
-    # make each pixel above a certain value into a region,
-    #   see what regions match?
-    # can threshold a colour image, but most stuff so far is for greyscale
-    #   make it greyscale
-    #   find the regions from the greyscale image
-    #   look at those regions in the colour image
-    #   identify the colour
-    #   ta-daa
-
-# TODO
-# work out trajectory of each object.
-# I have XYZ pos of each object for each frame that they're there for,
-# I just need to use them
-
-# TODO
-# get normalized distances between each of the points for each object
-# if all identical: straight line
-# if not all identical: alien
-
-ufoList: List[str] = []
-""" A list to hold all the UFOs """
-
-for k in [*objectPositions.keys()]:
-    print(k)
-    if not isThisAStraightLine(objectPositions[k]):
-        ufoList.append(k)
-
-print(ufoList)
-
-
-print("TODO remove this print statement")
