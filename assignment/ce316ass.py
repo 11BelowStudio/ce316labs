@@ -3,17 +3,24 @@
 **ce316ass.py**
 ---
 
-
-
-PURPOSE:
+---
+**PURPOSE:**
+---
 
 Given:
 
 * A number of frames to look at
-* A placeholder for filenames for left/right images
+    * Must be at least 1. Can't really look at less than 1 frame, y'know?
+* Templates for filenames for left/right images
     * such as left-%03d.png and right-%03d.png
-* Image files in the same directory as this file with filenames that conform
-  to the aforementioned template
+* Image files, which can be opened, with filenames that conform to the
+  aforementioned templates
+    * They must be of the same dimensions as each other.
+        * If the dimensions differ, the program will terminate with an error
+          message.
+    * They must be openable.
+        * If they cannot be opened, the program will terminate with an error
+          message.
 
 This will:
 
@@ -42,12 +49,15 @@ This will:
                 * Saturation of at least 1/256
             * Orange
                 * Hue 40-58
-        * Assumes is only one object of the given colour in the image
+        * Assumes there will be only one object of the given colour in the image
+            * or 0 objects of that given colour :shrug:
         * Assumes that the objects are not overlapping
     * Limitations
         * If any object is at the boundary of the image, it will be rejected.
             * This is because, if it's at the boundary, the midpoint calculated
-              is likely to be *very* inaccurate.
+              is likely to be *very* inaccurate (because the object is likely to
+              have been cut off somewhat), so, instead of dealing with that
+              headache, it's just ignored.
 * For each of the objects identified in every frame
     * Print their distance (in terms of Z depth) from the cameras, in metres.
         * Along with their full X, Y, Z position from the cameras
@@ -59,19 +69,117 @@ This will:
     * Limitations
         * If an object is not present in both images, it shall be ignored, due
           to not having full information about the x disparity for that frame.
-        * If an object is at the edge of an image, it will also be ignored, due
-          to the lack of accurate information
+        * If an object is at the edge of one of the images, it will also be
+          ignored, due to the lack of accurate information about midpoints
+* Work out the trajectories of each of the objects, printing a space-delimited
+  list of the identifiers of the objects that are probably UFOs (not moving
+  in a straight line)
+    * Assuming
+        * The object's position could be worked out for at least 3 frames.
+            * If fewer than 3 positions are known, there won't be enough points
+              in the line for the line to actually bend, so it'll treat it like
+              an asteroid.
+    * This is calculated via (ab)use of the dot products of unit vectors.
+        * Gets a normalized version of the vector between the first position and
+          the last position of the object in 3D space during these frames
+        * Also gets a normalized version of the vector that describes the
+          movement of the object between each 'frame'
+            * If this normalized vector is (0, 0, 0), we omit it because it will
+              completely mess up the maths.
+        * Finds the dot product of the normalized current frame movement vector
+          and the normalized total movement vector.
+            * Puts it on a list with all the found dot products
+        * Works out what 5% of the count of found dot products is
+        * Two unit vectors are equal if their dot product = 1.0
+            * Goes through that list of dot products, working out if that
+              dot product isClose to 1.0 (using isClose (hey!), to 9dp)
+                * We're using floats, and there's some inaccuracy with the
+                  position measurement, so we know that we're not going to get
+                  any dots that actually are going to be exactly 1.0
+        * If at least ~5% of the dots are **not** isClose to 1.0
+            * I am not ~95% sure that the line is straight, so, I'll accept the
+              null hypothesis that the object in question is a UFO.
 
+
+---
+
+**USAGE**
+
+---
+
+* python3 ce316ass.py 50 left-%03d.png right-%03d.png
+    * Assuming you have images called 'left-000.png' numbered to 'left-049.png',
+      and 'right-000.png' numbered to 'left-049.png' in this directory,
+      following all the assumptions/constraints in the 'PURPOSE' thing,
+      this will run.
+
+---
+
+**AUTHOR**
+
+--
+
+Student 1804170
+
+All the code written within this program is entirely my own work.
+
+--
+
+**RESULTS**
+
+--
+
+Given the sample data, this program produces an output of:
+    UFO: cyan white blue yellow orange
+    
+I was expecting Cyan to be a UFO. However, I wasn't really expecting the others
+to be UFOs.
+
+Changing the 'maxSus' value in the 'isThisAStraightLine' function to require
+10% of the found dots to be not close to 1 (instead of 5%) before identifying an
+object as a UFO returned this result instead:
+    UFO: cyan blue orange
+
+Again, I still wasn't expecting blue or orange to be a UFO. Then again, I find
+it nigh impossible to see stuff in stereo on a computer screen, so I genuinely
+don't know if the others are actually moving in a straight line or not.
+
+However, we need to consider the context of the problem.
+
+The problem is 'which of these things are aliens trying to attack earth and nick
+our PDMS'. Which, to me, sounds like the sort of program where false negatives
+are more dangerous than false positives.
+
+Therefore, to minimize the chance of false positives, and also to satisfy the
+self-declared stats person inside me, I am going to stick with the 5% 'not close
+to 1' threshold thing for the dot products.
+
+So basically, when you see 'UFO' on the printout, read '>5% not an asteroid'.
+Because if I'm not 95% confident of it being an asteroid (by having more than 5%
+of the dot products of normalized movements * overall normalized movement not be
+close to 1), I'm going to accuse it of being a UFO.
+
+Yes, I know, probably wasting shots with the thing that shoots the objects.
+
+However, seeing as not all of the objects are listed as 'UFOs' when using this
+threshold, I'm confident that I'm not getting *too* many false positives, so I'm
+considering it to be good enough.
+
+It runs pretty quickly though which is nice I guess.
 
 """
 
 
+# and time for some stuff to be imported.
 
 import sys
+# we need the command line arguments, the ability to quit, and the error stream
+from math import sqrt, isclose  # we need these for some of the maths.
+from typing import Tuple, List, Dict, Union  # No excuse to not type annotate.
+
 import cv2
-import numpy as np
-from typing import Tuple, List, Dict, Union
-from math import sqrt, isclose
+# we're doing computer vision, so opencv is also pretty darn useful.
+import numpy as np  # and it involves some numpy.ndarray objects!
 
 """
 --DEBUGGING FUNCTIONS FOR SEEING HOW THINGS WORK--
@@ -119,6 +227,7 @@ def debug(leftFilename: str, rightFilename: str,
     # the left and the right images.
 
 
+# noinspection PyPep8Naming
 def getObjectMasks(hsvIn: np.ndarray) -> Tuple[np.ndarray, np.ndarray,
                                                np.ndarray, np.ndarray,
                                                np.ndarray, np.ndarray,
@@ -133,7 +242,7 @@ def getObjectMasks(hsvIn: np.ndarray) -> Tuple[np.ndarray, np.ndarray,
     the one branch in the main program that may potentially call this code),
 
     Either way, this function won't be run until after those declarations are
-    reached, so no harm no foul.
+    reached, so no harm no foul or something along those lines.
 
     This code is explained better in the 'getObjectMidpoints' function,
     which has code that's basically identical to this.
@@ -168,6 +277,7 @@ def getObjectMasks(hsvIn: np.ndarray) -> Tuple[np.ndarray, np.ndarray,
             green_mask, yellow_mask, orange_mask)
 
 
+# noinspection PyPep8Naming
 def getStereoMasks(left_in: np.ndarray, right_in: np.ndarray) -> \
         List[Tuple[np.ndarray, np.ndarray]]:
     """
@@ -180,8 +290,12 @@ def getStereoMasks(left_in: np.ndarray, right_in: np.ndarray) -> \
      The list itself is in the order
      cyan->red->white->blue->green->yellow->orange.
     """
-    leftMasks = getObjectMasks(cv2.cvtColor(left_in, cv2.COLOR_BGR2HSV))
-    rightMasks = getObjectMasks(cv2.cvtColor(right_in, cv2.COLOR_BGR2HSV))
+    leftMasks: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+                     np.ndarray, np.ndarray, np.ndarray] =\
+        getObjectMasks(cv2.cvtColor(left_in, cv2.COLOR_BGR2HSV))
+    rightMasks: Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray,
+                      np.ndarray, np.ndarray, np.ndarray] =\
+        getObjectMasks(cv2.cvtColor(right_in, cv2.COLOR_BGR2HSV))
 
     theMasks: List[Tuple[np.ndarray, np.ndarray]] = []
     for i in range(0, 7):
@@ -190,6 +304,7 @@ def getStereoMasks(left_in: np.ndarray, right_in: np.ndarray) -> \
     return theMasks
 
 
+# noinspection PyPep8Naming
 def showMasksForDebugging(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
         None:
     """
@@ -208,21 +323,22 @@ def showMasksForDebugging(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
     objectOrder: List[str] = \
         ["cyan", "red", "white", "blue", "green", "yellow", "orange"]
 
-    magenta: Tuple[int, int, int] = (255, 0, 255)
-
     i: int = 0
     debugMasks: List[Tuple[np.ndarray, np.ndarray]] =\
-        getStereoMasks(i_left, i_right)
+        getStereoMasks(i_left, i_right)  # the masks for each image.
     for m in debugMasks:
-        showLeft: np.ndarray = np.ndarray.copy(m[0])
+        showLeft: np.ndarray = np.ndarray.copy(m[0])  # copy of the left mask
         label: str = str(objectOrder[i]) + " " + str(f)
         print(label)
+        # puts some text with object id and frame num on the left mask copy.
         cv2.putText(showLeft, label, (50, 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, 255, 2, cv2.LINE_AA)
+        # and shows the left/right masks
         cv2.imshow("left", showLeft)
         cv2.imshow("right", m[1])
         handleShowingStuff()
 
+        # finds midpoints of the object on the mask
         leftMid: Tuple[float, float] = getObjectMidpoint(m[0])
         rightMid: Tuple[float, float] = getObjectMidpoint(m[1])
 
@@ -231,21 +347,28 @@ def showMasksForDebugging(i_left: np.ndarray, i_right: np.ndarray, f: int) -> \
 
         showLeft: np.ndarray = cv2.bitwise_and(i_left, i_left, mask=m[0])
         showRight: np.ndarray = cv2.bitwise_and(i_right, i_right, mask=m[1])
+        # puts the annotation on the left copy again.
         cv2.putText(showLeft, label, (50, 50),
                     cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2,
                     cv2.LINE_AA)
         if leftMid != (-1, -1):
+            # if the left midpoint is valid, it's put on the left copy as a
+            # magenta dot at the int version of the midpoint.
             iLeftMid: Tuple[int, int] = (int(leftMid[0]), int(leftMid[1]))
-            cv2.line(showLeft, iLeftMid, iLeftMid, magenta, 1)
+            cv2.line(showLeft, iLeftMid, iLeftMid,  (255, 0, 255), 1)
         if rightMid != (-1, -1):
+            # ditto for the right image.
             iRightMid: Tuple[int, int] = (int(rightMid[0]), int(rightMid[1]))
-            cv2.line(showRight, iRightMid, iRightMid, magenta, 1)
+            cv2.line(showRight, iRightMid, iRightMid,  (255, 0, 255), 1)
+
+        # and shows them.
         cv2.imshow("left", showLeft)
         cv2.imshow("right", showRight)
         handleShowingStuff()
         i += 1
 
 
+# noinspection PyPep8Naming
 def handleShowingStuff() -> None:
     """
     This is here to handle actually showing stuff when debugging the program.
@@ -257,7 +380,7 @@ def handleShowingStuff() -> None:
     :return: nothing is returned.
     """
     print("press something to continue (press q or escape to quit)")
-    key = cv2.waitKey(0)
+    key: int = cv2.waitKey(0)
     # quit if escape (27) or q (113) are pressed
     if key == 27 or key == 113:
         cv2.destroyAllWindows()
@@ -313,6 +436,7 @@ A 3*3 numpy array of 1s, to be used when closing up holes in some of the masks
 """
 
 
+# noinspection PyPep8Naming
 def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
     """
     Returns the midpoint of the region of 1s in the given binary image array
@@ -329,6 +453,10 @@ def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
     keypoints correspond to each object, and refusing to detect the single
     object when I go through the effort of masking out everything else in the
     image), so I went 'fuck it, guess I'm doing it myself'
+
+    DISCLAIMER: I produced this code on the 3rd of March, several days before
+     that email was sent out suggesting that a procedure like this would be
+     worth using for the assignment.
 
     :param objectMask: binary image, with 1s in the area where the object
      with the midpoint being looked for is, and 0s everywhere else.
@@ -369,24 +497,25 @@ def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
     # and find out about what sort of shape the object has
     for y in range(1, ny-1):
         # we already established that the topmost/bottommost rows are empty.
-        if not objectMask[y].any():
-            # we skip this row if there's no 1s in it. you are welcome.
-            continue
-        for x in range(0, nx):
-            if objectMask[y][x] != 0: # if it's not 0, we've found it.
-                if notFoundFirst:
-                    notFoundFirst = False
-                    minX = maxX = x
-                    minY = maxY = y
-                else:
-                    if x < minX:
-                        minX = x
-                    elif x > maxX:
-                        maxX = x
-                    maxY = y
-                    # y wont get smaller.
-                    # and assignment has same complexity as checking a single
-                    # condition so I may as well just reassign y anyway.
+        if objectMask[y].any():
+            # we only bother with this row if it contains 1s
+            maxY = y
+            # y wont get smaller.
+            # and assignment has same complexity as checking a single
+            # condition so I may as well just reassign y anyway.
+            for x in range(0, nx):
+                if objectMask[y][x] != 0:
+                    # if it's not 0, we've found something!
+                    if notFoundFirst:
+                        # if we haven't found the first thing yet, we have now.
+                        notFoundFirst = False
+                        minX = maxX = x
+                        minY = maxY = y
+                    else:
+                        if x < minX:
+                            minX = x
+                        elif x > maxX:
+                            maxX = x
 
     # if it's at the x bounds of the image, the result definitely won't be
     # accurate, so we'll just return -1, -1.
@@ -406,6 +535,7 @@ def getObjectMidpoint(objectMask: np.ndarray) -> Tuple[float, float]:
     return xMid, yMid
 
 
+# noinspection PyPep8Naming
 def getObjectMidpoints(hsvIn: np.ndarray) -> Dict[str, Tuple[float, float]]:
     """
     Gets the midpoints for the objects that may be in the given HSV image.
@@ -467,11 +597,11 @@ def getObjectMidpoints(hsvIn: np.ndarray) -> Dict[str, Tuple[float, float]]:
     }
 
 
+# noinspection PyPep8Naming
 def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
         Dict[str,
              Tuple[Tuple[float, float],
-                   Tuple[float, float]]
-        ]:
+                   Tuple[float, float]]]:
     """
     Gets the positions of objects in the left and right *coloured* images.
     This **will** assume that the dimensions of the left and right images
@@ -494,7 +624,7 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
     yx: Tuple[int, int] = left_in.shape
     if yx != right_in.shape:
         # complains if the dimensions aren't identical.
-        raise ValueError("Please provide images with identical shapes.")
+        raise ValueError("Please provide images with identical dimensions.")
 
     lDict: Dict[str, Tuple[float, float]] = getObjectMidpoints(left_in)
     """dictionary with midpoints for every object in the left image"""
@@ -547,6 +677,12 @@ class Vector3D:
 
     References for particular sources for math stuff (when used) have been given
     in the methods for each of the functions that use the math stuff.
+
+    Now, you may ask yourself 'why is a class being used, when a tuple could
+    do the same thing?'. Simple answer; encapsulation (so I have the methods all
+    in the same place as each other). And also making sure I don't get confused
+    between tuples of floats and 3D vectors. The mutability is also nice for the
+    subtraction and the normalization stuff.
     """
     def __init__(self, x: float, y: float, z: float):
         """
@@ -572,16 +708,13 @@ class Vector3D:
         """
         return sqrt((self.x ** 2) + (self.y ** 2) + (self.z ** 2))
 
-    # noinspection PyUnresolvedReferences
-    def normalized(self):
+    def normalized(self) -> "Vector3D":
         """
-        Normalizes this Vector3D (makes the magnitude 1 by
+        Normalizes this Vector3D (makes the magnitude 1 by dividing all the
+         components of this Vector3D by its magnitude)
 
         :return: This Vector3D, but with a magnitude of 1 instead.
          if this already had a magnitude of 0, it'll return itself as-is.
-
-         Would have type-annotated the return type as Vector3D but Python didn't
-         really like that.
         """
         mag: float = self.magnitude()
         if mag > 0:
@@ -591,7 +724,7 @@ class Vector3D:
 
         return self
 
-    def subtract(self, other):
+    def subtract(self, other: "Vector3D") -> "Vector3D":
         """
         Subtracts the other Vector3D from this Vector3D, returning this
         modified Vector3D.
@@ -599,8 +732,7 @@ class Vector3D:
         Didn't need to get the maths from anywhere because subtraction is pretty
         darn simple and doesn't have any weirdness.
 
-        :param other: the other Vector3D to subtract from this. Would have type-
-         annotated this argument as Vector3D, but python didn't like that.
+        :param other: the other Vector3D to subtract from this.
         :return: this Vector3D minus 'other'. Would have type-annotated the
          return type as Vector3D, but python didn't like that.
         """
@@ -609,20 +741,18 @@ class Vector3D:
         self.z -= other.z
         return self
 
-    # noinspection PyUnresolvedReferences
-    def dot(self, other) -> float:
+    def dot(self, other: "Vector3D") -> float:
         """
         Returns the dot product of this Vector3D and the other Vector3D.
 
         Got the maths from https://www.quantumstudy.com/physics/vectors-2/
 
         :param other: the other Vector3D this is being dot product-ed against.
-         Would have type-annotated this argument as Vector3D, but python didn't
-         like that.
         :return: the dot product of this and the other vector3D
         """
         return (self.x * other.x) + (self.y * other.y) + (self.z * other.z)
 
+    # noinspection PyPep8Naming
     def isZero(self) -> bool:
         """
         Check if this vector is (0,0,0)
@@ -639,28 +769,9 @@ class Vector3D:
         return str((self.x, self.y, self.z))
 
 
-def normalizeVector(v: Vector3D) -> Vector3D:
-    """
-    Obtains a version of this Vector3 with the x, y, and z normalized
-
-    :return: a version of this with a magnitude of 1. However,
-    if this already had a magnitude of 0, it'll return a vector3 with
-    a value of (0,0,0)
-    """
-    return Vector3D(v.x, v.y, v.z).normalized()
-
-
-def subVector(lhs: Vector3D, rhs: Vector3D) -> Vector3D:
-    """
-    Subtracts one Vector3D from another Vector3D, without modifying the original
-    :param lhs: left hand side
-    :param rhs: right hand side vector
-    :return: Vector3D that's equal to lhs - rhs
-    """
-    return Vector3D(lhs.x, lhs.y, lhs.z).subtract(rhs)
-
-
-def normalizeVectorBetweenPoints(fromVec: Vector3D, to: Vector3D) -> Vector3D:
+# noinspection PyPep8Naming
+def normalizeVectorBetweenPoints(fromVec: Vector3D, toVec: Vector3D) ->\
+        Vector3D:
     """
     Get lhs-rhs but normalized instead (leaving lhs and rhs untouched)
 
@@ -677,12 +788,13 @@ def normalizeVectorBetweenPoints(fromVec: Vector3D, to: Vector3D) -> Vector3D:
     (0, 0, 0)
 
     :param fromVec: going from this vector
-    :param to: to this other vector
-    :return: to - fromVec but normalized
+    :param toVec: to this other vector
+    :return: toVec - fromVec but normalized. Or in other words, the direction of
+     movement from the position 'fromVec' to the position 'toVec'
     """
-
-    return subVector(fromVec, to).normalized()
-
+    return Vector3D(toVec.x, toVec.y, toVec.z)\
+        .subtract(fromVec)\
+        .normalized()
 
 
 placeholderOutString: str = "{:5}  {:8}  {:8.2e}  {}"
@@ -704,6 +816,7 @@ pixelSize: float = float(1e-5)
 "pixel spacing: 10 microns -> 1e-5 metres"
 
 
+# noinspection PyPep8Naming
 def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
                                         rightIm: np.ndarray,
                                         frameNum: int = 0) -> \
@@ -743,6 +856,7 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
     in both the left and the right images.
     """
 
+    # noinspection PyShadowingNames
     posXYZ: Dict[str, Vector3D] = {}
     """
     this will hold the X, Y, Z coords of the objects in 3D space,
@@ -817,6 +931,7 @@ isThisAStraightLine function (immediately below this)
 """
 
 
+# noinspection PyPep8Naming
 def isThisAStraightLine(line: List[Vector3D]) -> bool:
     """
     Returns whether or not a sequence of 3D points is a straight line,
@@ -867,11 +982,11 @@ def isThisAStraightLine(line: List[Vector3D]) -> bool:
     """
 
     while True:
-        thisIndex += 1 # we move to the next index of the list
+        thisIndex += 1  # we move to the next index of the list
         if thisIndex >= len(line):
             # we're basically emulating a do/while loop here
             # with a while condition of thisIndex < len(line)
-            # so when we get to the last index, we finish the loop
+            # so when we get to the end of the list, we stop looping.
             break
 
         thisDiff: Vector3D = \
@@ -914,7 +1029,7 @@ def isThisAStraightLine(line: List[Vector3D]) -> bool:
         if debuggingLineStuff:
             print(thisDot)
 
-        dots.append(thisDot) # and we append the current dot product to dots.
+        dots.append(thisDot)  # and we append the current dot product to dots.
 
     if len(dots) == 0:
         # if all the differences between positions were (0,0,0), this ain't bent
@@ -942,7 +1057,7 @@ def isThisAStraightLine(line: List[Vector3D]) -> bool:
     """
 
     if debuggingLineStuff:
-        print("imposter is " + str(maxSus) + " sus!") # WHEN THE IMPOSTER IS SUS
+        print("ufo is " + str(maxSus) + " sus!")  # WHEN THE UFO IS SUS!
 
     susCount: int = 0
     "The count of how many times the dot product has been not equal to 1."
@@ -968,20 +1083,21 @@ def isThisAStraightLine(line: List[Vector3D]) -> bool:
             if debuggingLineStuff:
                 print("diff " + str(debugCount) + " is " +
                       str(susCount) + " sus")
-            if susCount == maxSus: # WHEN THE IMPOSTER IS SUS
-                return False # amogus
+            if susCount == maxSus:  # WHEN THE UFO IS SUS
+                return False  # amogus
         debugCount += 1
 
     # if it hasn't been thrown out as sus yet, it's probably a straight line.
     return True
 
 
-def makeUfoString(objectPositions: Dict[str, List[Vector3D]]) -> str:
+# noinspection PyPep8Naming
+def makeUfoString(objPositions: Dict[str, List[Vector3D]]) -> str:
     """
     Given the dictionary of object identifiers + lists with all of
     their Vector3D positions, create the space delimited string with the
     list of all the identifiers of objects that are UFOs
-    :param objectPositions: dictionary of object identifiers + Vector3D
+    :param objPositions: dictionary of object identifiers + Vector3D
      positions for all the objects that may or may not be UFOs
     :return: string with the identifiers of what is and isn't a UFO
     """
@@ -990,8 +1106,8 @@ def makeUfoString(objectPositions: Dict[str, List[Vector3D]]) -> str:
     The space-delimited string of UFO identifiers.
     """
 
-    for key in [*objectPositions.keys()]:
-        if not isThisAStraightLine(objectPositions[key]):
+    for key in [*objPositions.keys()]:
+        if not isThisAStraightLine(objPositions[key]):
             # we check if the list of points is a straight line.
             # If they aren't a straight line, we know this is a UFO, so
             # it's appended to the ufoString.
@@ -1001,6 +1117,7 @@ def makeUfoString(objectPositions: Dict[str, List[Vector3D]]) -> str:
     return ufoString
 
 
+# noinspection PyPep8Naming
 def checkIfImageWasOpened(filename: str, img: Union[np.ndarray, None]) -> None:
     """
     This will check if the image with the given filename could be opened
@@ -1089,28 +1206,26 @@ frame.
 
 print("frame  identity  distance")  # header for the required frame data info.
 
-# the following lines were adapted from the assignment brief.
+# the following 10 lines were adapted from the assignment brief.
 for frame in range(0, nframes):
     # we work out the filenames for the left and right images for this frame,
     # and then we open those images using opencv.
     # (and also check to see if the images could actually be opened.)
     fn_left: str = sys.argv[2] % frame
-    im_left: np.ndarray = cv2.imread(fn_left)
-    """The left image for this frame (BGR)"""
+    im_left: np.ndarray = cv2.imread(fn_left)  # left image (BGR)
     checkIfImageWasOpened(fn_left, im_left)
 
     fn_right: str = sys.argv[3] % frame
-    im_right: np.ndarray = cv2.imread(fn_right)
-    """The right image for this frame (BGR)"""
+    im_right: np.ndarray = cv2.imread(fn_right) # Right image (BGR)
     checkIfImageWasOpened(fn_right, im_right)
 
     if debugging:
         """
-        You remember those testing functions from earlier, right?
-        Well, this is where they get used. If you enabled 'testing' ofc.
+        You remember those debugging functions from earlier, right?
+        Well, this is where they get used. If you enabled 'debugging' ofc.
         """
         debug(fn_left, fn_right, im_left, im_right, frame)
-        # END OF TESTING CODE
+        # END OF DEBUGGING CODE
 
     posXYZ: Dict[str, Vector3D] = \
         calculateAndPrintPositionsOfObjects(im_left, im_right, frame)
@@ -1126,4 +1241,6 @@ for frame in range(0, nframes):
 # Finally, we print out what is/isn't a UFO.
 makeUfoString(objectPositions)
 
-
+"""
+That's all, folks!
+"""
