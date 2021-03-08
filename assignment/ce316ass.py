@@ -1066,7 +1066,7 @@ def isThisAStraightLine(line: List[Vector3D]) -> bool:
     "just here as a printout for debug purposes."
 
     for d in dots:
-        if not isclose(d, 1.0):
+        if not isclose(1, d, rel_tol=1e-09):
             """
             We're using floating-point numbers here, so, because it's nigh
             impossible to get a dot of 1.0 (mostly due to the slight inaccuracy
