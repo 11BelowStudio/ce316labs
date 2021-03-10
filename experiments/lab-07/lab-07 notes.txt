@@ -1,0 +1,1246 @@
+BONEFORRI-CORRECTED P VALUE:
+
+	Original P/number of tests
+	
+	Original critical value * number of tests
+	
+	95% Critical value for 1 test: 1.646
+		10 paired tests: 16.46
+	97.5% 1 test: 1.960
+		10 tests: 19.6
+	99% 1 test: 2.326
+		10 tests: 23.26
+	99.5% 1 test: 2.576
+		10 tests: 25.76
+		
+		
+	
+RUNNING FACT COMPARE FOR THE MNIST THINGS
+
+	The comparison in the table was performed using McNemar's test:
+
+	  Z = |Nsf - Nfs| - 1
+		  ---------------
+		     _________
+		   \|Nsf + Nfs
+
+	where Nsf is the number of cases where the first algorithm succeeded
+	and the second failed, etc.  Each line shows the better-performing
+	algorithm.
+
+
+	Comparison of mnist-eigen.res and mnist-mlp.res
+	  Z-score  class    better			sig
+		 3.33  0        mnist-eigen.res	INSIGNIFICANT
+		33.48  1        mnist-mlp.res 	99.5%
+		31.62  2        mnist-mlp.res	99.5
+		31.43  3        mnist-mlp.res	99.5
+		30.89  4        mnist-mlp.res	99.5
+		29.36  5        mnist-mlp.res	99.5
+		30.55  6        mnist-mlp.res	99.5
+		31.50  7        mnist-mlp.res	99.5
+		30.59  8        mnist-mlp.res	99.5
+		31.34  9        mnist-mlp.res	99.5
+		 0.00  failure  neither
+
+	Comparison of mnist-eigen.res and mnist-rf.res
+	  Z-score  class    better
+		 3.02  0        mnist-eigen.res	INSIGNIFICANT
+		33.48  1        mnist-rf.res	99.5%
+		31.58  2        mnist-rf.res	99.5%
+		31.23  3        mnist-rf.res	99.5%
+		30.89  4        mnist-rf.res	99.5%
+		29.31  5        mnist-rf.res	99.5%
+		30.64  6        mnist-rf.res	99.5%
+		31.42  7        mnist-rf.res	99.5%
+		30.48  8        mnist-rf.res	99.5%
+		30.97  9        mnist-rf.res	99.5%
+		 0.00  failure  neither
+
+	Comparison of mnist-eigen.res and mnist-svm.res
+	  Z-score  class    better
+		 2.47  0        mnist-eigen.res	INSIGNIFICANT
+		33.53  1        mnist-svm.res	99.5%
+		31.80  2        mnist-svm.res	99.5%
+		31.48  3        mnist-svm.res	99.5%
+		31.00  4        mnist-svm.res	99.5%
+		29.41  5        mnist-svm.res	99.5%
+		30.69  6        mnist-svm.res	99.5%
+		31.54  7        mnist-svm.res	99.5%
+		30.77  8        mnist-svm.res	99.5%
+		31.16  9        mnist-svm.res	99.5%
+		 0.00  failure  neither
+
+	Comparison of mnist-eigen.res and mnist-wisard.res
+	  Z-score  class    better
+		29.88  0        mnist-eigen.res		99.5%
+		 0.00  1        neither				INSIGNIFICANT
+		 4.69  2        mnist-wisard.res	INSIGNIFICANT
+		 2.27  3        mnist-wisard.res	INSIGNIFICANT
+		 0.00  4        neither				INSIGNIFICANT
+		 0.00  5        neither				INSIGNIFICANT
+		 1.15  6        mnist-wisard.res	INSIGNIFICANT
+		 0.00  7        neither				INSIGNIFICANT
+		 0.00  8        neither				INSIGNIFICANT
+		 0.00  9        neither				INSIGNIFICANT
+		 0.00  failure  neither				INSIGNIFICANT
+
+	Comparison of mnist-mlp.res and mnist-rf.res
+	  Z-score  class    better
+		 0.35  0        mnist-rf.res	INSIGNIFICANT
+		 0.00  1        neither			
+		 0.37  2        mnist-mlp.res	
+		 2.31  3        mnist-mlp.res	
+		 0.00  4        neither			
+		 0.42  5        mnist-mlp.res	
+		 1.18  6        mnist-rf.res	
+		 0.62  7        mnist-mlp.res	
+		 1.04  8        mnist-mlp.res	
+		 3.35  9        mnist-mlp.res	
+		 0.00  failure  neither
+
+	Comparison of mnist-mlp.res and mnist-svm.res
+	  Z-score  class    better
+		 1.51  0        mnist-svm.res	INSIGNIFICANT
+		 1.15  1        mnist-svm.res
+		 2.29  2        mnist-svm.res
+		 0.52  3        mnist-svm.res
+		 1.38  4        mnist-svm.res
+		 0.49  5        mnist-svm.res
+		 1.94  6        mnist-svm.res
+		 0.38  7        mnist-svm.res
+		 2.18  8        mnist-svm.res
+		 1.92  9        mnist-mlp.res
+		 0.00  failure  neither
+
+	Comparison of mnist-mlp.res and mnist-wisard.res
+	  Z-score  class    better
+		29.66  0        mnist-mlp.res	99.5%
+		33.48  1        mnist-mlp.res	99.5%
+		31.24  2        mnist-mlp.res	99.5%
+		31.32  3        mnist-mlp.res	99.5%
+		30.87  4        mnist-mlp.res	99.5%
+		29.34  5        mnist-mlp.res	99.5%
+		30.50  6        mnist-mlp.res	99.5%
+		31.50  7        mnist-mlp.res	99.5%
+		30.59  8        mnist-mlp.res	99.5%
+		31.34  9        mnist-mlp.res	99.5%
+		 0.00  failure  neither
+
+	Comparison of mnist-rf.res and mnist-svm.res
+	  Z-score  class    better
+		 0.89  0        mnist-svm.res	INSIGNIFICANT
+		 0.76  1        mnist-svm.res
+		 2.77  2        mnist-svm.res
+		 2.94  3        mnist-svm.res
+		 1.55  4        mnist-svm.res
+		 1.18  5        mnist-svm.res
+		 0.76  6        mnist-svm.res
+		 1.32  7        mnist-svm.res
+		 3.01  8        mnist-svm.res
+		 2.16  9        mnist-svm.res
+		 0.00  failure  neither
+
+	Comparison of mnist-rf.res and mnist-wisard.res
+	  Z-score  class    better
+		29.70  0        mnist-rf.res	99.5%
+		33.48  1        mnist-rf.res	99.5%
+		31.19  2        mnist-rf.res	99.5%
+		31.11  3        mnist-rf.res	99.5%
+		30.87  4        mnist-rf.res	99.5%
+		29.29  5        mnist-rf.res	99.5%
+		30.59  6        mnist-rf.res	99.5%
+		31.42  7        mnist-rf.res	99.5%
+		30.48  8        mnist-rf.res	99.5%
+		30.97  9        mnist-rf.res	99.5%
+		 0.00  failure  neither
+
+	Comparison of mnist-svm.res and mnist-wisard.res
+	  Z-score  class    better
+		29.75  0        mnist-svm.res	99.5%
+		33.53  1        mnist-svm.res	99.5%
+		31.42  2        mnist-svm.res	99.5%
+		31.37  3        mnist-svm.res	99.5%
+		30.98  4        mnist-svm.res	99.5%
+		29.39  5        mnist-svm.res	99.5%
+		30.64  6        mnist-svm.res	99.5%
+		31.54  7        mnist-svm.res	99.5%
+		30.77  8        mnist-svm.res	99.5%
+		31.16  9        mnist-svm.res	99.5%
+		 0.00  failure  neither
+
+From this
+
+* EIGEN
+	* beats
+		* 
+	* beaten by
+		* MLP
+		* RF
+		* SVM
+* MLP
+	* beats
+		* EIGEN
+		* WISARD
+	* beaten by
+		* 
+* RF
+	* beats
+		* EIGEN
+		* WISARD
+	* beaten by
+		* 
+* SVM
+	* beats
+		* EIGEN
+		* WISARD
+	* beaten by
+		* 
+* WISARD
+	* beats
+		* 
+	* beaten by
+		* MLP
+		* RF
+		* WISARD
+
+TOP TIER
+	* MLP
+	* RF
+	* SVM
+BOTTOM TIER
+	* EIGEN
+	* WISARD
+
+
+## ORL5 ##
+
+
+	Comparison of orl5-eigen.res and orl5-mlp.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 1.50  s01      orl5-eigen.res
+		 1.50  s02      orl5-eigen.res
+		 1.50  s03      orl5-eigen.res
+		 1.50  s04      orl5-eigen.res
+		 1.15  s05      orl5-eigen.res
+		 1.50  s06      orl5-eigen.res
+		 1.50  s07      orl5-eigen.res
+		 1.50  s08      orl5-eigen.res
+		 1.50  s09      orl5-eigen.res
+		 1.15  s10      orl5-eigen.res
+		 1.15  s11      orl5-eigen.res
+		 1.50  s12      orl5-eigen.res
+		 1.50  s13      orl5-eigen.res
+		 1.15  s14      orl5-eigen.res
+		 1.50  s15      orl5-eigen.res
+		 1.15  s16      orl5-eigen.res
+		 0.71  s17      orl5-eigen.res
+		 1.50  s18      orl5-eigen.res
+		 1.15  s19      orl5-eigen.res
+		 0.00  s20      neither
+		 1.50  s21      orl5-eigen.res
+		 1.50  s22      orl5-eigen.res
+		 1.50  s23      orl5-eigen.res
+		 1.50  s24      orl5-eigen.res
+		 1.50  s25      orl5-eigen.res
+		 1.50  s26      orl5-eigen.res
+		 0.71  s27      orl5-eigen.res
+		 1.15  s28      orl5-eigen.res
+		 1.50  s29      orl5-eigen.res
+		 1.50  s30      orl5-eigen.res
+		 1.50  s31      orl5-eigen.res
+		 1.15  s32      orl5-eigen.res
+		 1.50  s33      orl5-eigen.res
+		 1.50  s34      orl5-eigen.res
+		 1.50  s35      orl5-eigen.res
+		 1.15  s36      orl5-eigen.res
+		 1.50  s37      orl5-eigen.res
+		 1.50  s38      orl5-eigen.res
+		 1.15  s39      orl5-eigen.res
+		 1.15  s40      orl5-eigen.res
+		 
+	eigen > mlp
+
+	Comparison of orl5-eigen.res and orl5-rf.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.00  s01      neither
+		 0.00  s02      neither
+		 0.00  s03      neither
+		 0.00  s04      neither
+		 0.00  s05      neither
+		 0.00  s06      neither
+		 0.00  s07      neither
+		 0.00  s08      neither
+		 0.00  s09      neither
+		 0.00  s10      neither
+		 0.00  s11      neither
+		 0.71  s12      orl5-eigen.res
+		 0.00  s13      neither
+		 0.00  s14      neither
+		 0.00  s15      neither
+		 1.15  s16      orl5-eigen.res
+		 0.71  s17      orl5-eigen.res
+		 0.00  s18      neither
+		 0.00  s19      neither
+		 0.71  s20      orl5-eigen.res
+		 0.00  s21      neither
+		 0.00  s22      neither
+		 0.00  s23      neither
+		 0.00  s24      neither
+		 0.00  s25      neither
+		 0.71  s26      orl5-eigen.res
+		 0.00  s27      neither
+		 0.71  s28      orl5-eigen.res
+		 0.00  s29      neither
+		 0.00  s30      neither
+		 1.15  s31      orl5-eigen.res
+		 0.00  s32      neither
+		 0.00  s33      neither
+		 0.00  s34      neither
+		 0.71  s35      orl5-eigen.res
+		 0.71  s36      orl5-eigen.res
+		 0.00  s37      neither
+		 0.00  s38      neither
+		 0.00  s39      neither
+		 0.00  s40      neither
+
+	Comparison of orl5-eigen.res and orl5-svm.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.00  s01      neither
+		 0.00  s02      neither
+		 0.00  s03      neither
+		 0.00  s04      neither
+		 0.00  s05      neither
+		 0.00  s06      neither
+		 0.00  s07      neither
+		 0.00  s08      neither
+		 0.00  s09      neither
+		 0.00  s10      neither
+		 0.00  s11      neither
+		 0.00  s12      neither
+		 0.00  s13      neither
+		 1.15  s14      orl5-eigen.res
+		 0.00  s15      neither
+		 0.00  s16      neither
+		 0.71  s17      orl5-eigen.res
+		 0.00  s18      neither
+		 0.00  s19      neither
+		 0.00  s20      neither
+		 0.00  s21      neither
+		 0.00  s22      neither
+		 0.00  s23      neither
+		 0.00  s24      neither
+		 0.00  s25      neither
+		 0.00  s26      neither
+		 0.00  s27      neither
+		 0.00  s28      neither
+		 0.00  s29      neither
+		 0.00  s30      neither
+		 0.00  s31      neither
+		 0.00  s32      neither
+		 0.00  s33      neither
+		 0.00  s34      neither
+		 0.00  s35      neither
+		 0.00  s36      neither
+		 0.00  s37      neither
+		 0.00  s38      neither
+		 0.00  s39      neither
+		 0.00  s40      neither
+
+	Comparison of orl5-eigen.res and orl5-wisard.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.71  s01      orl5-eigen.res
+		 1.50  s02      orl5-eigen.res
+		 1.50  s03      orl5-eigen.res
+		 0.00  s04      neither
+		 0.71  s05      orl5-eigen.res
+		 0.00  s06      neither
+		 0.71  s07      orl5-eigen.res
+		 0.00  s08      neither
+		 1.15  s09      orl5-eigen.res
+		 0.71  s10      orl5-eigen.res
+		 0.00  s11      neither
+		 1.15  s12      orl5-eigen.res
+		 0.00  s13      neither
+		 1.15  s14      orl5-eigen.res
+		 0.00  s15      neither
+		 0.71  s16      orl5-eigen.res
+		 0.71  s17      orl5-eigen.res
+		 1.50  s18      orl5-eigen.res
+		 0.00  s19      neither
+		 1.15  s20      orl5-eigen.res
+		 0.00  s21      neither
+		 1.15  s22      orl5-eigen.res
+		 0.00  s23      neither
+		 0.71  s24      orl5-eigen.res
+		 0.71  s25      orl5-eigen.res
+		 0.71  s26      orl5-eigen.res
+		 0.00  s27      neither
+		 0.00  s28      neither
+		 1.15  s29      orl5-eigen.res
+		 1.50  s30      orl5-eigen.res
+		 1.50  s31      orl5-eigen.res
+		 0.00  s32      neither
+		 0.71  s33      orl5-eigen.res
+		 0.00  s34      neither
+		 1.50  s35      orl5-eigen.res
+		 0.00  s36      neither
+		 0.00  s37      neither
+		 0.00  s38      neither
+		 1.15  s39      orl5-eigen.res
+		 0.00  s40      neither
+		 
+	eigen > wisard
+
+	Comparison of orl5-mlp.res and orl5-rf.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 1.50  s01      orl5-rf.res
+		 1.50  s02      orl5-rf.res
+		 1.50  s03      orl5-rf.res
+		 1.50  s04      orl5-rf.res
+		 1.15  s05      orl5-rf.res
+		 1.50  s06      orl5-rf.res
+		 1.15  s07      orl5-rf.res
+		 1.50  s08      orl5-rf.res
+		 1.15  s09      orl5-rf.res
+		 1.50  s10      orl5-rf.res
+		 0.71  s11      orl5-rf.res
+		 0.71  s12      orl5-rf.res
+		 1.50  s13      orl5-rf.res
+		 0.71  s14      orl5-rf.res
+		 1.50  s15      orl5-rf.res
+		 0.00  s16      neither
+		 0.00  s17      neither
+		 1.50  s18      orl5-rf.res
+		 1.15  s19      orl5-rf.res
+		 1.15  s20      orl5-mlp.res
+		 1.50  s21      orl5-rf.res
+		 1.50  s22      orl5-rf.res
+		 1.50  s23      orl5-rf.res
+		 1.50  s24      orl5-rf.res
+		 1.15  s25      orl5-rf.res
+		 0.71  s26      orl5-rf.res
+		 0.00  s27      neither
+		 0.00  s28      neither
+		 1.50  s29      orl5-rf.res
+		 1.50  s30      orl5-rf.res
+		 0.00  s31      neither
+		 0.71  s32      orl5-rf.res
+		 1.50  s33      orl5-rf.res
+		 1.50  s34      orl5-rf.res
+		 0.71  s35      orl5-rf.res
+		 0.00  s36      neither
+		 1.15  s37      orl5-rf.res
+		 1.50  s38      orl5-rf.res
+		 1.50  s39      orl5-rf.res
+		 0.71  s40      orl5-rf.res
+		 
+	rf > mlp
+
+	Comparison of orl5-mlp.res and orl5-svm.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 1.50  s01      orl5-svm.res
+		 1.50  s02      orl5-svm.res
+		 1.50  s03      orl5-svm.res
+		 1.50  s04      orl5-svm.res
+		 1.15  s05      orl5-svm.res
+		 1.50  s06      orl5-svm.res
+		 1.50  s07      orl5-svm.res
+		 1.50  s08      orl5-svm.res
+		 1.15  s09      orl5-svm.res
+		 1.15  s10      orl5-svm.res
+		 1.50  s11      orl5-svm.res
+		 1.50  s12      orl5-svm.res
+		 1.50  s13      orl5-svm.res
+		 0.00  s14      neither
+		 1.50  s15      orl5-svm.res
+		 1.15  s16      orl5-svm.res
+		 0.00  s17      neither
+		 1.50  s18      orl5-svm.res
+		 1.15  s19      orl5-svm.res
+		 0.00  s20      neither
+		 1.50  s21      orl5-svm.res
+		 1.50  s22      orl5-svm.res
+		 1.50  s23      orl5-svm.res
+		 1.50  s24      orl5-svm.res
+		 1.50  s25      orl5-svm.res
+		 1.15  s26      orl5-svm.res
+		 0.00  s27      neither
+		 1.15  s28      orl5-svm.res
+		 1.50  s29      orl5-svm.res
+		 1.50  s30      orl5-svm.res
+		 1.15  s31      orl5-svm.res
+		 1.15  s32      orl5-svm.res
+		 1.50  s33      orl5-svm.res
+		 1.50  s34      orl5-svm.res
+		 1.50  s35      orl5-svm.res
+		 1.50  s36      orl5-svm.res
+		 1.50  s37      orl5-svm.res
+		 1.50  s38      orl5-svm.res
+		 1.50  s39      orl5-svm.res
+		 1.50  s40      orl5-svm.res
+		 
+	svm > mlp
+
+	Comparison of orl5-mlp.res and orl5-wisard.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.71  s01      orl5-wisard.res
+		 0.00  s02      neither
+		 0.00  s03      neither
+		 1.50  s04      orl5-wisard.res
+		 0.00  s05      neither
+		 1.50  s06      orl5-wisard.res
+		 0.71  s07      orl5-wisard.res
+		 1.50  s08      orl5-wisard.res
+		 0.00  s09      neither
+		 0.00  s10      neither
+		 0.71  s11      orl5-wisard.res
+		 0.00  s12      neither
+		 1.15  s13      orl5-wisard.res
+		 0.00  s14      neither
+		 1.15  s15      orl5-wisard.res
+		 0.00  s16      neither
+		 0.00  s17      neither
+		 0.00  s18      neither
+		 1.15  s19      orl5-wisard.res
+		 1.50  s20      orl5-mlp.res
+		 1.50  s21      orl5-wisard.res
+		 0.00  s22      neither
+		 1.15  s23      orl5-wisard.res
+		 0.71  s24      orl5-wisard.res
+		 0.71  s25      orl5-wisard.res
+		 0.71  s26      orl5-wisard.res
+		 0.00  s27      neither
+		 1.15  s28      orl5-wisard.res
+		 0.00  s29      neither
+		 0.00  s30      neither
+		 0.00  s31      neither
+		 0.71  s32      orl5-wisard.res
+		 0.71  s33      orl5-wisard.res
+		 1.15  s34      orl5-wisard.res
+		 0.00  s35      neither
+		 0.71  s36      orl5-wisard.res
+		 1.50  s37      orl5-wisard.res
+		 1.15  s38      orl5-wisard.res
+		 0.00  s39      neither
+		 1.15  s40      orl5-wisard.res
+		 
+	wisard > mlp
+
+	Comparison of orl5-rf.res and orl5-svm.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.00  s01      neither
+		 0.00  s02      neither
+		 0.00  s03      neither
+		 0.00  s04      neither
+		 0.00  s05      neither
+		 0.00  s06      neither
+		 0.00  s07      neither
+		 0.00  s08      neither
+		 0.00  s09      neither
+		 0.00  s10      neither
+		 0.71  s11      orl5-svm.res
+		 0.71  s12      orl5-svm.res
+		 0.00  s13      neither
+		 0.71  s14      orl5-rf.res
+		 0.00  s15      neither
+		 1.15  s16      orl5-svm.res
+		 0.00  s17      neither
+		 0.00  s18      neither
+		 0.00  s19      neither
+		 1.15  s20      orl5-svm.res
+		 0.00  s21      neither
+		 0.00  s22      neither
+		 0.00  s23      neither
+		 0.00  s24      neither
+		 0.00  s25      neither
+		 0.00  s26      neither
+		 0.00  s27      neither
+		 0.71  s28      orl5-svm.res
+		 0.00  s29      neither
+		 0.00  s30      neither
+		 0.71  s31      orl5-svm.res
+		 0.00  s32      neither
+		 0.00  s33      neither
+		 0.00  s34      neither
+		 0.71  s35      orl5-svm.res
+		 1.15  s36      orl5-svm.res
+		 0.00  s37      neither
+		 0.00  s38      neither
+		 0.00  s39      neither
+		 0.71  s40      orl5-svm.res
+		 
+	svm > mlp (barely)
+
+	Comparison of orl5-rf.res and orl5-wisard.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.71  s01      orl5-rf.res
+		 1.50  s02      orl5-rf.res
+		 1.50  s03      orl5-rf.res
+		 0.00  s04      neither
+		 0.71  s05      orl5-rf.res
+		 0.00  s06      neither
+		 0.00  s07      neither
+		 0.00  s08      neither
+		 0.71  s09      orl5-rf.res
+		 1.15  s10      orl5-rf.res
+		 0.00  s11      neither
+		 0.00  s12      neither
+		 0.00  s13      neither
+		 0.71  s14      orl5-rf.res
+		 0.00  s15      neither
+		 0.00  s16      neither
+		 0.00  s17      neither
+		 1.50  s18      orl5-rf.res
+		 0.00  s19      neither
+		 0.00  s20      neither
+		 0.00  s21      neither
+		 1.15  s22      orl5-rf.res
+		 0.00  s23      neither
+		 0.71  s24      orl5-rf.res
+		 0.00  s25      neither
+		 0.00  s26      neither
+		 0.00  s27      neither
+		 0.71  s28      orl5-wisard.res
+		 1.15  s29      orl5-rf.res
+		 1.50  s30      orl5-rf.res
+		 0.00  s31      neither
+		 0.00  s32      neither
+		 0.71  s33      orl5-rf.res
+		 0.00  s34      neither
+		 0.71  s35      orl5-rf.res
+		 0.00  s36      neither
+		 0.00  s37      neither
+		 0.00  s38      neither
+		 1.50  s39      orl5-rf.res
+		 0.00  s40      neither
+		 
+	rf > wisard (barely)
+
+	Comparison of orl5-svm.res and orl5-wisard.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.71  s01      orl5-svm.res
+		 1.50  s02      orl5-svm.res
+		 1.50  s03      orl5-svm.res
+		 0.00  s04      neither
+		 0.71  s05      orl5-svm.res
+		 0.00  s06      neither
+		 0.71  s07      orl5-svm.res
+		 0.00  s08      neither
+		 0.71  s09      orl5-svm.res
+		 0.71  s10      orl5-svm.res
+		 0.71  s11      orl5-svm.res
+		 1.15  s12      orl5-svm.res
+		 0.00  s13      neither
+		 0.00  s14      neither
+		 0.00  s15      neither
+		 0.71  s16      orl5-svm.res
+		 0.00  s17      neither
+		 1.50  s18      orl5-svm.res
+		 0.00  s19      neither
+		 1.50  s20      orl5-svm.res
+		 0.00  s21      neither
+		 1.15  s22      orl5-svm.res
+		 0.00  s23      neither
+		 0.71  s24      orl5-svm.res
+		 0.71  s25      orl5-svm.res
+		 0.00  s26      neither
+		 0.00  s27      neither
+		 0.00  s28      neither
+		 1.15  s29      orl5-svm.res
+		 1.50  s30      orl5-svm.res
+		 1.15  s31      orl5-svm.res
+		 0.00  s32      neither
+		 0.71  s33      orl5-svm.res
+		 0.00  s34      neither
+		 1.50  s35      orl5-svm.res
+		 0.71  s36      orl5-svm.res
+		 0.00  s37      neither
+		 0.00  s38      neither
+		 1.50  s39      orl5-svm.res
+		 0.00  s40      neither
+		 
+	svm > wisard (barely)
+
+
+From this
+
+NONE ARE SIGNIFICANT!!!!
+
+* EIGEN
+	* beats
+		* MLP
+		* (rf)
+		* ((svm))
+		* WISARD
+	* beaten by
+		* 
+* MLP
+	* beats
+		* WISARD
+	* beaten by
+		* EIGEN
+		* RF
+		* SVM
+* RF
+	* beats
+		* MLP
+		* (wisard)
+	* beaten by
+		* ((eigen))
+		* (svm)
+* SVM
+	* beats
+		* MLP
+		* WISARD
+	* beaten by
+		* (eigen)
+		* (rf)
+* WISARD
+	* beats
+		* 
+	* beaten by
+		* EIGEN
+		* MLP
+		* (rf)
+		* SVM
+		
+FROM THIS
+
+1: EIGEN
+2: SVM
+3: RF
+4: MLP
+5: WISARD
+
+## ORL6 ##
+
+	Comparison of orl6-eigen.res and orl6-mlp.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 1.50  s01      orl6-eigen.res
+		 1.50  s02      orl6-eigen.res
+		 1.50  s03      orl6-eigen.res
+		 1.50  s04      orl6-eigen.res
+		 1.15  s05      orl6-eigen.res
+		 1.50  s06      orl6-eigen.res
+		 1.50  s07      orl6-eigen.res
+		 1.50  s08      orl6-eigen.res
+		 1.50  s09      orl6-eigen.res
+		 1.15  s10      orl6-eigen.res
+		 1.15  s11      orl6-eigen.res
+		 1.50  s12      orl6-eigen.res
+		 1.50  s13      orl6-eigen.res
+		 1.50  s14      orl6-eigen.res
+		 1.50  s15      orl6-eigen.res
+		 1.15  s16      orl6-eigen.res
+		 1.50  s17      orl6-eigen.res
+		 1.50  s18      orl6-eigen.res
+		 1.15  s19      orl6-eigen.res
+		 1.15  s20      orl6-eigen.res
+		 1.50  s21      orl6-eigen.res
+		 1.50  s22      orl6-eigen.res
+		 1.50  s23      orl6-eigen.res
+		 1.50  s24      orl6-eigen.res
+		 1.50  s25      orl6-eigen.res
+		 1.50  s26      orl6-eigen.res
+		 1.50  s27      orl6-eigen.res
+		 1.15  s28      orl6-eigen.res
+		 1.50  s29      orl6-eigen.res
+		 1.50  s30      orl6-eigen.res
+		 1.50  s31      orl6-eigen.res
+		 0.00  s32      neither
+		 1.50  s33      orl6-eigen.res
+		 1.50  s34      orl6-eigen.res
+		 1.50  s35      orl6-eigen.res
+		 1.50  s36      orl6-eigen.res
+		 1.50  s37      orl6-eigen.res
+		 1.50  s38      orl6-eigen.res
+		 1.50  s39      orl6-eigen.res
+		 0.71  s40      orl6-eigen.res
+		 
+	eigen > mlp
+
+	Comparison of orl6-eigen.res and orl6-rf.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.00  s01      neither
+		 0.00  s02      neither
+		 0.00  s03      neither
+		 0.00  s04      neither
+		 0.00  s05      neither
+		 0.00  s06      neither
+		 0.00  s07      neither
+		 0.00  s08      neither
+		 0.71  s09      orl6-eigen.res
+		 0.00  s10      neither
+		 0.00  s11      neither
+		 0.00  s12      neither
+		 0.00  s13      neither
+		 0.00  s14      neither
+		 0.00  s15      neither
+		 0.71  s16      orl6-eigen.res
+		 0.00  s17      neither
+		 0.00  s18      neither
+		 0.00  s19      neither
+		 0.00  s20      neither
+		 0.00  s21      neither
+		 0.00  s22      neither
+		 0.00  s23      neither
+		 0.00  s24      neither
+		 0.00  s25      neither
+		 0.71  s26      orl6-eigen.res
+		 0.00  s27      neither
+		 0.00  s28      neither
+		 0.00  s29      neither
+		 0.00  s30      neither
+		 0.00  s31      neither
+		 0.00  s32      neither
+		 0.00  s33      neither
+		 0.00  s34      neither
+		 0.71  s35      orl6-eigen.res
+		 0.00  s36      neither
+		 0.00  s37      neither
+		 0.00  s38      neither
+		 1.15  s39      orl6-eigen.res
+		 0.00  s40      neither
+		 
+	eigen > rf
+	
+
+	Comparison of orl6-eigen.res and orl6-svm.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.00  s01      neither
+		 0.00  s02      neither
+		 0.00  s03      neither
+		 0.00  s04      neither
+		 0.00  s05      neither
+		 0.00  s06      neither
+		 0.00  s07      neither
+		 0.00  s08      neither
+		 0.00  s09      neither
+		 0.00  s10      neither
+		 0.00  s11      neither
+		 0.00  s12      neither
+		 0.00  s13      neither
+		 0.00  s14      neither
+		 0.00  s15      neither
+		 0.00  s16      neither
+		 0.00  s17      neither
+		 0.00  s18      neither
+		 0.00  s19      neither
+		 0.00  s20      neither
+		 0.00  s21      neither
+		 0.00  s22      neither
+		 0.00  s23      neither
+		 0.00  s24      neither
+		 0.00  s25      neither
+		 0.00  s26      neither
+		 0.00  s27      neither
+		 0.00  s28      neither
+		 0.00  s29      neither
+		 0.00  s30      neither
+		 0.00  s31      neither
+		 0.00  s32      neither
+		 0.00  s33      neither
+		 0.00  s34      neither
+		 0.00  s35      neither
+		 0.00  s36      neither
+		 0.00  s37      neither
+		 0.00  s38      neither
+		 0.00  s39      neither
+		 0.71  s40      orl6-svm.res
+		 
+	nah
+
+	Comparison of orl6-eigen.res and orl6-wisard.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.00  s01      neither
+		 1.50  s02      orl6-eigen.res
+		 1.15  s03      orl6-eigen.res
+		 0.00  s04      neither
+		 0.71  s05      orl6-eigen.res
+		 0.00  s06      neither
+		 0.00  s07      neither
+		 0.00  s08      neither
+		 1.50  s09      orl6-eigen.res
+		 0.00  s10      neither
+		 0.00  s11      neither
+		 1.50  s12      orl6-eigen.res
+		 0.00  s13      neither
+		 1.15  s14      orl6-eigen.res
+		 0.00  s15      neither
+		 1.15  s16      orl6-eigen.res
+		 1.15  s17      orl6-eigen.res
+		 1.15  s18      orl6-eigen.res
+		 0.71  s19      orl6-eigen.res
+		 1.15  s20      orl6-eigen.res
+		 0.00  s21      neither
+		 1.15  s22      orl6-eigen.res
+		 0.00  s23      neither
+		 0.71  s24      orl6-eigen.res
+		 0.71  s25      orl6-eigen.res
+		 0.71  s26      orl6-eigen.res
+		 1.15  s27      orl6-eigen.res
+		 0.00  s28      neither
+		 1.15  s29      orl6-eigen.res
+		 0.00  s30      neither
+		 1.15  s31      orl6-eigen.res
+		 0.00  s32      neither
+		 0.00  s33      neither
+		 0.00  s34      neither
+		 1.50  s35      orl6-eigen.res
+		 0.71  s36      orl6-eigen.res
+		 0.00  s37      neither
+		 0.71  s38      orl6-eigen.res
+		 1.50  s39      orl6-eigen.res
+		 0.71  s40      orl6-wisard.res
+		 
+	eigen > wisard
+	
+
+	Comparison of orl6-mlp.res and orl6-rf.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 1.50  s01      orl6-rf.res
+		 1.50  s02      orl6-rf.res
+		 1.50  s03      orl6-rf.res
+		 1.50  s04      orl6-rf.res
+		 1.15  s05      orl6-rf.res
+		 1.50  s06      orl6-rf.res
+		 1.50  s07      orl6-rf.res
+		 1.50  s08      orl6-rf.res
+		 0.71  s09      orl6-rf.res
+		 0.71  s10      orl6-rf.res
+		 1.15  s11      orl6-rf.res
+		 1.15  s12      orl6-rf.res
+		 1.50  s13      orl6-rf.res
+		 1.15  s14      orl6-rf.res
+		 1.50  s15      orl6-rf.res
+		 0.00  s16      neither
+		 1.15  s17      orl6-rf.res
+		 1.50  s18      orl6-rf.res
+		 1.15  s19      orl6-rf.res
+		 1.15  s20      orl6-rf.res
+		 1.50  s21      orl6-rf.res
+		 1.15  s22      orl6-rf.res
+		 1.15  s23      orl6-rf.res
+		 1.50  s24      orl6-rf.res
+		 1.50  s25      orl6-rf.res
+		 0.71  s26      orl6-rf.res
+		 1.15  s27      orl6-rf.res
+		 1.15  s28      orl6-rf.res
+		 1.50  s29      orl6-rf.res
+		 1.50  s30      orl6-rf.res
+		 1.50  s31      orl6-rf.res
+		 0.00  s32      neither
+		 1.15  s33      orl6-rf.res
+		 1.50  s34      orl6-rf.res
+		 0.71  s35      orl6-rf.res
+		 1.15  s36      orl6-rf.res
+		 1.15  s37      orl6-rf.res
+		 1.15  s38      orl6-rf.res
+		 0.00  s39      neither
+		 0.00  s40      neither
+		 
+	rf > mlp
+
+	Comparison of orl6-mlp.res and orl6-svm.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 1.50  s01      orl6-svm.res
+		 1.50  s02      orl6-svm.res
+		 1.50  s03      orl6-svm.res
+		 1.50  s04      orl6-svm.res
+		 1.15  s05      orl6-svm.res
+		 1.50  s06      orl6-svm.res
+		 1.50  s07      orl6-svm.res
+		 1.50  s08      orl6-svm.res
+		 1.50  s09      orl6-svm.res
+		 1.15  s10      orl6-svm.res
+		 1.50  s11      orl6-svm.res
+		 1.50  s12      orl6-svm.res
+		 1.50  s13      orl6-svm.res
+		 1.50  s14      orl6-svm.res
+		 1.50  s15      orl6-svm.res
+		 1.15  s16      orl6-svm.res
+		 1.50  s17      orl6-svm.res
+		 1.50  s18      orl6-svm.res
+		 1.15  s19      orl6-svm.res
+		 1.50  s20      orl6-svm.res
+		 1.50  s21      orl6-svm.res
+		 1.50  s22      orl6-svm.res
+		 1.50  s23      orl6-svm.res
+		 1.50  s24      orl6-svm.res
+		 1.50  s25      orl6-svm.res
+		 1.15  s26      orl6-svm.res
+		 1.15  s27      orl6-svm.res
+		 1.15  s28      orl6-svm.res
+		 1.50  s29      orl6-svm.res
+		 1.50  s30      orl6-svm.res
+		 1.15  s31      orl6-svm.res
+		 0.00  s32      neither
+		 1.50  s33      orl6-svm.res
+		 1.50  s34      orl6-svm.res
+		 1.50  s35      orl6-svm.res
+		 1.50  s36      orl6-svm.res
+		 1.50  s37      orl6-svm.res
+		 1.50  s38      orl6-svm.res
+		 1.50  s39      orl6-svm.res
+		 1.50  s40      orl6-svm.res
+		 
+	svm > mlp
+
+	Comparison of orl6-mlp.res and orl6-wisard.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 1.15  s01      orl6-wisard.res
+		 0.00  s02      neither
+		 0.00  s03      neither
+		 1.50  s04      orl6-wisard.res
+		 0.00  s05      neither
+		 1.50  s06      orl6-wisard.res
+		 1.15  s07      orl6-wisard.res
+		 1.50  s08      orl6-wisard.res
+		 0.00  s09      neither
+		 0.71  s10      orl6-wisard.res
+		 0.71  s11      orl6-wisard.res
+		 0.00  s12      neither
+		 1.15  s13      orl6-wisard.res
+		 0.00  s14      neither
+		 1.15  s15      orl6-wisard.res
+		 0.00  s16      neither
+		 0.00  s17      neither
+		 0.00  s18      neither
+		 0.00  s19      neither
+		 0.00  s20      neither
+		 1.50  s21      orl6-wisard.res
+		 0.00  s22      neither
+		 1.15  s23      orl6-wisard.res
+		 0.71  s24      orl6-wisard.res
+		 0.71  s25      orl6-wisard.res
+		 0.71  s26      orl6-wisard.res
+		 0.00  s27      neither
+		 1.15  s28      orl6-wisard.res
+		 0.00  s29      neither
+		 1.15  s30      orl6-wisard.res
+		 0.00  s31      neither
+		 0.71  s32      orl6-mlp.res
+		 1.15  s33      orl6-wisard.res
+		 1.50  s34      orl6-wisard.res
+		 0.00  s35      neither
+		 0.71  s36      orl6-wisard.res
+		 1.15  s37      orl6-wisard.res
+		 0.71  s38      orl6-wisard.res
+		 0.00  s39      neither
+		 1.50  s40      orl6-wisard.res
+		 
+	wisard > mlp
+
+	Comparison of orl6-rf.res and orl6-svm.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.00  s01      neither
+		 0.00  s02      neither
+		 0.00  s03      neither
+		 0.00  s04      neither
+		 0.00  s05      neither
+		 0.00  s06      neither
+		 0.00  s07      neither
+		 0.00  s08      neither
+		 0.71  s09      orl6-svm.res
+		 0.00  s10      neither
+		 0.00  s11      neither
+		 0.00  s12      neither
+		 0.00  s13      neither
+		 0.00  s14      neither
+		 0.00  s15      neither
+		 0.71  s16      orl6-svm.res
+		 0.00  s17      neither
+		 0.00  s18      neither
+		 0.00  s19      neither
+		 0.00  s20      neither
+		 0.00  s21      neither
+		 0.00  s22      neither
+		 0.00  s23      neither
+		 0.00  s24      neither
+		 0.00  s25      neither
+		 0.00  s26      neither
+		 0.00  s27      neither
+		 0.00  s28      neither
+		 0.00  s29      neither
+		 0.00  s30      neither
+		 0.00  s31      neither
+		 0.00  s32      neither
+		 0.00  s33      neither
+		 0.00  s34      neither
+		 0.71  s35      orl6-svm.res
+		 0.00  s36      neither
+		 0.00  s37      neither
+		 0.00  s38      neither
+		 1.15  s39      orl6-svm.res
+		 1.15  s40      orl6-svm.res
+		 
+	svm > rf (barely)
+
+	Comparison of orl6-rf.res and orl6-wisard.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.00  s01      neither
+		 1.50  s02      orl6-rf.res
+		 1.15  s03      orl6-rf.res
+		 0.00  s04      neither
+		 0.71  s05      orl6-rf.res
+		 0.00  s06      neither
+		 0.00  s07      neither
+		 0.00  s08      neither
+		 0.71  s09      orl6-rf.res
+		 0.00  s10      neither
+		 0.00  s11      neither
+		 1.15  s12      orl6-rf.res
+		 0.00  s13      neither
+		 0.71  s14      orl6-rf.res
+		 0.00  s15      neither
+		 0.00  s16      neither
+		 0.71  s17      orl6-rf.res
+		 1.15  s18      orl6-rf.res
+		 0.71  s19      orl6-rf.res
+		 1.15  s20      orl6-rf.res
+		 0.00  s21      neither
+		 0.71  s22      orl6-rf.res
+		 0.00  s23      neither
+		 0.71  s24      orl6-rf.res
+		 0.71  s25      orl6-rf.res
+		 0.00  s26      neither
+		 0.71  s27      orl6-rf.res
+		 0.00  s28      neither
+		 1.15  s29      orl6-rf.res
+		 0.00  s30      neither
+		 1.15  s31      orl6-rf.res
+		 0.00  s32      neither
+		 0.00  s33      neither
+		 0.00  s34      neither
+		 0.71  s35      orl6-rf.res
+		 0.00  s36      neither
+		 0.00  s37      neither
+		 0.00  s38      neither
+		 0.00  s39      neither
+		 1.15  s40      orl6-wisard.res
+		 
+	rf > wisard
+
+	Comparison of orl6-svm.res and orl6-wisard.res
+	  Z-score  class    better
+		 0.00  failure  neither
+		 0.00  s01      neither
+		 1.50  s02      orl6-svm.res
+		 1.15  s03      orl6-svm.res
+		 0.00  s04      neither
+		 0.71  s05      orl6-svm.res
+		 0.00  s06      neither
+		 0.00  s07      neither
+		 0.00  s08      neither
+		 1.50  s09      orl6-svm.res
+		 0.00  s10      neither
+		 0.71  s11      orl6-svm.res
+		 1.50  s12      orl6-svm.res
+		 0.00  s13      neither
+		 1.15  s14      orl6-svm.res
+		 0.00  s15      neither
+		 1.15  s16      orl6-svm.res
+		 1.15  s17      orl6-svm.res
+		 1.15  s18      orl6-svm.res
+		 0.71  s19      orl6-svm.res
+		 1.50  s20      orl6-svm.res
+		 0.00  s21      neither
+		 1.15  s22      orl6-svm.res
+		 0.00  s23      neither
+		 0.71  s24      orl6-svm.res
+		 0.71  s25      orl6-svm.res
+		 0.00  s26      neither
+		 0.71  s27      orl6-svm.res
+		 0.00  s28      neither
+		 1.15  s29      orl6-svm.res
+		 0.00  s30      neither
+		 0.71  s31      orl6-svm.res
+		 0.71  s32      orl6-svm.res
+		 0.00  s33      neither
+		 0.00  s34      neither
+		 1.50  s35      orl6-svm.res
+		 0.71  s36      orl6-svm.res
+		 0.00  s37      neither
+		 0.71  s38      orl6-svm.res
+		 1.50  s39      orl6-svm.res
+		 0.00  s40      neither
+		 
+	svm > wisard
+
+
+
+
+From this
+
+eigen > wisard
+eigen > rf
+eigen > mlp
+rf > mlp
+svm > mlp
+wisard > mlp
+svm > rf (barely)
+rf > wisard
+svm > wisard
+
+* EIGEN
+	* beats
+		* WISARD
+		* RF
+		* MLP
+	* beaten by
+		* 
+* MLP
+	* beats
+		* 
+	* beaten by
+		* EIGEN
+		* RF
+		* SVM
+		* WISARD
+* RF
+	* beats
+		* MLP
+		* WISARD
+	* beaten by
+		* EIGEN
+		* (svm)
+* SVM
+	* beats
+		* MLP
+		* (rf)
+		* WISARD
+	* beaten by
+		* 
+* WISARD
+	* beats
+		* MLP
+	* beaten by
+		* EIGEN
+		* RF
+		* SVM
+
+1: EIGEN
+2: SVM
+3: RF
+4: WISARD
+5: MLP
