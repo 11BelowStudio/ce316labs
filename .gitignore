@@ -1,2 +1,16 @@
 /venv/
 /notes.pdf
+/experiments/lab-07/orl/
+/experiments/lab-07/mnist/
+/experiments/lab-07/mnist-rf.kb
+/experiments/lab-07/orl6-wisard.kb
+/experiments/lab-07/orl6-svm.kb
+/experiments/lab-07/orl6-rf.kb
+/experiments/lab-07/orl6-mlp.kb
+/experiments/lab-07/orl6-eigen.kb
+/experiments/lab-07/orl5-wisard.kb
+/experiments/lab-07/orl5-svm.kb
+/experiments/lab-07/orl5-rf.kb
+/experiments/lab-07/orl5-mlp.kb
+/experiments/lab-07/orl5-eigen.kb
+/experiments/lab-07/mnist-svm.kb

@@ -1,0 +1,956 @@
+#!/usr/bin/env python3
+#-------------------------------------------------------------------------------
+# m l  --  machine learning
+#-------------------------------------------------------------------------------
+
+"""
+This is a general-purpose wrapper program for several machine learning
+techniques, providing a generic and consistent interface to them."""
+
+timestamp = \
+    "Time-stamp: <2020-10-15 08:45:43 Adrian F Clark (alien@essex.ac.uk)>"
+__doc__ += "\nVersion " + timestamp[13:-1] + "\n"
+
+#-------------------------------------------------------------------------------
+# Boilerplate.
+#-------------------------------------------------------------------------------
+
+import argparse, datetime, math, os, pickle, random, re, sys, time, timeit
+import numpy, sklearn
+from sklearn import svm
+from sklearn.neural_network import MLPClassifier
+from sklearn.ensemble import RandomForestClassifier
+import eve
+
+if True:
+    import keras, tensorflow
+    from keras.models import Sequential
+    from keras.layers import Dense, Dropout, Flatten, Conv2D, MaxPooling2D
+
+#-------------------------------------------------------------------------------
+# Recognition by a Convolutional Neural Network.
+#-------------------------------------------------------------------------------
+
+def train_cnn (files, classes, epochs, loud):
+    "Train a CNN recognizer using `files`, returning the result."
+
+    # Read in the first image and determine its sizes.
+    im = load_image (files[0])
+    ny1, nx1, nc = eve.sizes (im)
+
+    # Work through files.  All images must have the same sizes for the recognizer
+    # to work correctly so resize to match that of the first image if necessary.
+    n = len (files)
+    images = []
+    for i in range (0, n):
+        im = load_image (files[i])
+        ny, nx, nc = eve.sizes (im)
+        if nc > 1: im = eve.mono (im)
+        if ny != ny1 or nx != nx1:
+            im = eve.resize (im, ny1, nx1)
+
+        # Most machine learning techniques, SVM included, want their data values
+        # in the range zero to unity.
+        im = im / 255.0
+        images += [im.copy().flatten()]
+
+    # Set up the classifier and train it.
+    classifier = Sequential ()
+    classifier.add (Conv2D (32, kernel_size=(3, 3), activation="relu",
+                            input_shape=(ny1, nx1, 1)))
+    classifier.add (Conv2D (64, (3, 3), activation="relu"))
+    classifier.add (MaxPooling2D (pool_size=(2, 2)))
+    classifier.add (Dropout (0.25))
+    classifier.add (Flatten ())
+    classifier.add (Dense (128, activation="relu"))
+    classifier.add (Dropout (0.5))
+    classifier.add (Dense (n, activation="softmax"))
+
+    try:
+        classifier.compile (loss=keras.losses.categorical_crossentropy,
+                            optimizer=keras.optimizers.Adadelta(),
+                            metrics=["accuracy"])
+        classifier.fit (images, classes, batch_size=120, epochs=epochs,
+                        verbose=0)
+    except ValueError:
+        error ("Alas, CNN training failed!", status=11)
+
+    # Return what we have found.
+    return classifier
+
+def test_cnn (kbase, files, classes, loud):
+    "Test a CNN recognizer in `kbase` using `files`."
+
+    if loud: message ("Using Scikit-learn version:", sklearn.__version__)
+    classifier = kbase
+
+    # Read in the first image and determine its sizes.
+    n = len(files)
+    im = load_image (files[0])
+    ny1, nx1, nc = eve.sizes (im)
+
+    # Start our timer and loop over the files.
+    results = []
+    start_time = timeit.default_timer ()
+
+    images = []
+    for i in range (0, n):
+        # Load the test image.
+        im = load_image (files[i])
+        ny, nx, nc = eve.sizes (im)
+        if nc > 1: im = eve.mono (im)
+        if ny != ny1 or nx != nx1:
+            im = eve.resize (im, ny1, nx1)
+
+        # Most machine learning techniques, SVM included, want their data values
+        # in the range zero to unity.
+        im = im / 255.0
+        images += [im.copy().flatten()]
+
+    # Run the classifier on the test images, then stop the timer.
+    cls = numpy.argmax (classifier.predict (images), axis=-1)
+    elapsed = timeit.default_timer () - start_time
+
+    # Build up the results in the appropriate form and return them.
+    results = []
+    for i in range (0, n):
+        results += [[files[i], classes[i], "S", cls[i]]]
+    return results, elapsed
+
+#-------------------------------------------------------------------------------
+# Recognition by Eigen decomposition.
+#-------------------------------------------------------------------------------
+
+def train_eigen (files, classes, nmax, loud):
+    "Train an eigen recognizer using `files`, returning the result."
+
+    # Work through files, reading them in and determining the associated labels.
+    # Eigen decomposition requires that all images have the same sizes, so we
+    # re-size to match the first image if necessary.
+    images, labels = [], []
+    first = True
+    for ifn in range (0, len (files)):
+        fn = files[ifn]
+        id = classes[ifn]
+        im = load_image (fn)
+        ny, nx, nc = eve.sizes (im)
+        if nc > 1: im = eve.mono (im)
+        if first:
+            ny1 = ny
+            nx1 = nx
+            first = False
+        else:
+            if ny != ny1 or nx != nx1:
+                im = eve.resize (im, ny1, nx1)
+        images.append (im)
+        labels.append (id)
+
+    # Perform the eigen decomposition of the images.
+    evals, evecs, ave_im = eve.pca_images (images)
+
+    # Possibly restrict the number of eigenvectors etc.
+    ne = len (evals)
+    if nmax <= 0: nmax = ne
+    if nmax > ne: nmax = ne
+    if loud: message ("Saving %d eigenvectors etc" % nmax)
+
+    # For each image, find the corresponding weight coefficients.
+    coefs= []
+    for i in range (0, nmax):
+        p = eve.pca_project (images[i], evecs[:nmax], ave_im)
+        coefs += [[labels[i], p]]
+
+    # Return the knowledge: evecs, ave_im, coefs.
+    return [evecs[:nmax], ave_im, coefs]
+
+def test_eigen (kbase, files, classes, matcher, nmax, loud):
+    "Test the eigen recognizer in `kbase` using `files`."
+
+    # Unpack the knowledge base into the original Eigen decomposition.
+    evecs, ave_im, coefs = kbase
+    ne = len (evecs)
+
+    # Possibly restrict the number of eigenvectors etc.
+    if nmax <= 0: nmax = ne
+    if nmax > ne: nmax = ne
+    if loud: message ("Using %d eigenvectors etc" % nmax)
+
+    # Start our timer.
+    start_time = timeit.default_timer ()
+
+    # Process each test file in turn.
+    # Eigen decomposition requires that all images have the same sizes, so we
+    # re-size to match the first image if necessary.
+    first = True
+    results = []
+    for ifn in range (0, len(files)):
+        fn = files[ifn]
+        cls = classes[ifn]
+        im = load_image (fn)
+        ny, nx, nc = eve.sizes (im)
+        if nc > 1:
+            im = eve.mono (im)
+        if first:
+            ny1 = ny
+            nx1 = nx
+            first = False
+        else:
+            if ny != ny1 or nx != nx1:
+                im = eve.resize (im, ny1, nx1)
+
+        # Project it into the eigen space.
+        p = eve.pca_project (im, evecs[:nmax], ave_im)
+
+        # The best match in coefs is the ID.
+        best = 1.0e35
+        best_id = "?"
+        for coef in coefs:
+            label, v = coef
+            score = matcher (p[:nmax], v[:nmax])
+            if score < best:
+                best = score
+                best_id = label
+
+        # Store away what we have found.
+        status = "F" if best_id == "?" else "S"
+        if best_id == "?": best_id = "failure"
+        results += [[fn, cls, status, best_id]]
+
+    elapsed = timeit.default_timer () - start_time
+    return results, elapsed
+
+#-------------------------------------------------------------------------------
+# Recognition using a Multi-Layer Perceptron (MLP).
+#-------------------------------------------------------------------------------
+
+def train_mlp (files, classes, epochs, alpha, tol, rate, loud):
+    "Train a MLP recognizer using `files`, returning the result."
+
+    if loud: message ("Using Scikit-learn version:", sklearn.__version__)
+
+    # Read in the first image and determine its sizes.
+    im = load_image (files[0])
+    ny1, nx1, nc = eve.sizes (im)
+
+    # Work through files.  All images must have the same sizes for the recognizer
+    # to work correctly so resize to match that of the first image if necessary.
+    n = len (files)
+    images = []
+    for i in range (0, n):
+        im = load_image (files[i])
+        ny, nx, nc = eve.sizes (im)
+        if nc > 1: im = eve.mono (im)
+        if ny != ny1 or nx != nx1:
+            im = eve.resize (im, ny1, nx1)
+
+        # Most machine learning techniques, SVM included, want their data values
+        # in the range zero to unity.
+        im = im / 255.0
+        images += [im.copy().flatten()]
+
+    # Set up the classifier and then train it.
+    classifier = MLPClassifier (hidden_layer_sizes=(50,), max_iter=epochs,
+                            solver="sgd", alpha=alpha, tol=tol,
+                            learning_rate_init=rate, verbose=False)
+
+    try:
+        classifier.fit (numpy.array (images), numpy.array (classes))
+    except ValueError:
+        error ("Alas, MLP training failed!", status=11)
+
+    # Return what we have found.
+    return classifier
+
+#-------------------------------------------------------------------------------
+# Recognition with a Random Forest (RF).
+#-------------------------------------------------------------------------------
+
+def train_rf (files, classes, estimators=None, loud=False):
+    "Train a RF recognizer using `files`, returning the result."
+
+    if loud: message ("Using Scikit-learn version:", sklearn.__version__)
+
+    # Read in the first image and determine its sizes.
+    im = load_image (files[0])
+    ny1, nx1, nc = eve.sizes (im)
+
+    # Work through files.  All images must have the same sizes for the recognizer
+    # to work correctly so resize to match that of the first image if necessary.
+    n = len (files)
+   
+    images = []
+    for i in range (0, n):
+        im = load_image (files[i])
+        ny, nx, nc = eve.sizes (im)
+        if nc > 1: im = eve.mono (im)
+        if ny != ny1 or nx != nx1:
+            im = eve.resize (im, ny1, nx1)
+
+        # Most machine learning techniques, SVM included, want their data values
+        # in the range zero to unity.
+        im = im / 255.0
+        images += [im.copy().flatten()]
+
+    # Set up the classifier and then train it.
+    classifier = RandomForestClassifier (n_estimators=estimators)
+
+    try:
+        classifier.fit (numpy.array (images), numpy.array (classes))
+    except ValueError:
+        error ("Alas, RF training failed!", status=11)
+
+    # Return what we have found.
+    return classifier
+
+#-------------------------------------------------------------------------------
+# Recognition with a Support Vector Machine (SVM).
+#-------------------------------------------------------------------------------
+
+def train_svm (files, classes, c, gamma, loud):
+    "Train a SVM recognizer using `files`, returning the result."
+
+    if loud: message ("Using Scikit-learn version:", sklearn.__version__)
+
+    # Read in the first image and determine its sizes.
+    im = load_image (files[0])
+    ny1, nx1, nc = eve.sizes (im)
+
+    # Work through files.  All images must have the same sizes for the recognizer
+    # to work correctly so resize to match that of the first image if necessary.
+    n = len (files)
+    images = []
+    for i in range (0, n):
+        im = load_image (files[i])
+        ny, nx, nc = eve.sizes (im)
+        if nc > 1: im = eve.mono (im)
+        if ny != ny1 or nx != nx1:
+            im = eve.resize (im, ny1, nx1)
+
+        # Most machine learning techniques, SVM included, want their data values
+        # in the range zero to unity.
+        im = im / 255.0
+        images += [im.copy().flatten()]
+
+    # Create a classifier with the parameter settings from
+    # http://www.trungh.com/2013/04/digit-recognition-using-svm-in-python/
+    # then train it.
+    classifier = sklearn.svm.SVC (kernel="rbf", C=c, gamma=gamma)
+
+    try:
+        classifier.fit (numpy.array (images), numpy.array (classes))
+    except ValueError:
+        error ("Alas, SVM training failed!", status=11)
+
+    # Return what we have found.
+    return classifier
+
+def test_sklearn (kbase, files, classes, loud):
+    "Test a Scikit-learn recognizer in `kbase` using `files`."
+
+    if loud: message ("Using Scikit-learn version:", sklearn.__version__)
+    classifier = kbase
+
+    # Read in the first image and determine its sizes.
+    n = len(files)
+    im = load_image (files[0])
+    ny1, nx1, nc = eve.sizes (im)
+
+    # Start our timer and loop over the files.
+    results = []
+    start_time = timeit.default_timer ()
+
+    images = []
+    for i in range (0, n):
+        # Load the test image.
+        im = load_image (files[i])
+        ny, nx, nc = eve.sizes (im)
+        if nc > 1: im = eve.mono (im)
+        if ny != ny1 or nx != nx1:
+            im = eve.resize (im, ny1, nx1)
+
+        # Most machine learning techniques, SVM included, want their data values
+        # in the range zero to unity.
+        im = im / 255.0
+        images += [im.copy().flatten()]
+
+    # Run the classifier on the test images, then stop the timer.
+    cls = classifier.predict (numpy.array (images))
+    elapsed = timeit.default_timer () - start_time
+
+    # Build up the results in the appropriate form and return them.
+    results = []
+    for i in range (0, n):
+        results += [[files[i], classes[i], "S", cls[i]]]
+    return results, elapsed
+
+#-------------------------------------------------------------------------------
+# Recognition via WISARD, "Wilkie, Stonham and Aleksander's Recognition Device"
+#-------------------------------------------------------------------------------
+# The idea behind WISARD is to sample at
+# a number "nlocs" of randomly-chosen       +----------------------------+
+# locations in an image to form a "tuple".  |                            |
+# Some "ntuples" tuples are sampled.        |    1                       |
+# Each image location has a value of zero   |                      2     |
+# zero or unity (the image is binarized).   |                            |
+#                                           |                            |
+# The nlocs values are concatenated into    |                            |
+# a nlocs-long bit-string which is used as  |               1            |
+# an index into a chunk of RAM.  When       |  1                         |
+# learning, the indexed RAM location is     |  2                    2    |
+# set, and this is done separately for      |                            |
+# each tuple.  When running, the number     +----------------------------+
+# of set RAM locations is counted to give
+# a "score" for the image being examined.  The sketch above has nlocs = 3
+# and ntuples = 2.
+#
+# In Python, the easiest way to implement the formation of an index and RAM is
+# actually to use a dictionary: the dictionary key corresponds to the index and
+# the value stored in it corresponds to the content of the RAM.  Implementation
+# is therefore pretty straightforward.
+
+def train_wisard (files, classes, nlocs, ntuples, threshold, loud):
+    "Train a WISARD recognizer using `files`, returning the result."
+
+    # Read in the first image and determine its sizes.
+    im = load_image (files[0])
+    ny1, nx1, nc = eve.sizes (im)
+
+    # Generate the sampling locations within that image.
+    tuples = []
+    for tup in range (0, ntuples):
+        locs = []
+        for loc in range (0, nlocs):
+            y = random.randrange (0, ny1)
+            x = random.randrange (0, nx1)
+            locs += [[y, x]]
+        tuples += [locs]
+
+    # Work through files.  All images must have the same sizes for the sampling
+    # to work correctly so resize to match that of the first image if necessary.
+    rams = {}
+    for ifn in range (0, len (files)):
+        fn = files[ifn]
+        id = classes[ifn]
+        im = load_image (fn)
+        ny, nx, nc = eve.sizes (im)
+        if nc > 1: im = eve.mono (im)
+        if ny != ny1 or nx != nx1:
+            im = eve.resize (im, ny1, nx1)
+
+        # Create a RAM for this ID if it doesn't already exist.
+        if id not in rams:
+            rams[id] = {}
+
+        # Fill the relevant RAM.
+        for tup in tuples:
+            key = ""
+            for y, x in tup:
+                v = im[y, x, 0]
+                d = "1" if v > threshold else "0"
+                key += d
+                rams[id][key] = 1
+
+    return [ny1, nx1, threshold, tuples, rams]
+
+def test_wisard (kbase, files, classes, loud):
+    "Test the WISARD recognizer in `kbase` using `files`."
+
+    # Unpack the knowledge base and pull out the possible IDs.
+    ny1, nx1, threshold, tuples, rams = kbase
+    ids = rams.keys ()
+
+    # Start our timer and loop over the files.
+    results = []
+    start_time = timeit.default_timer ()
+
+    for ifn in range (0, len(files)):
+        fn = files[ifn]
+        cls = classes[ifn]
+        # Load the test image.
+        im = load_image (fn)
+        ny, nx, nc = eve.sizes (im)
+        if nc > 1: im = eve.mono (im)
+        if ny != ny1 or nx != nx1:
+            im = eve.resize (im, ny1, nx1)
+    
+        # Work out the score from each RAM for this image.
+        scores = {}
+        for k in ids:
+            scores[k] = 0
+        for tup in tuples:
+            key = ""
+            for y, x in tup:
+                v = im[y, x, 0]
+                d = "1" if v > threshold else "0"
+                key += d
+            for id in ids:
+                if key in rams[id]: scores[id] += 1
+
+        # Find the ID that gives the highest score.
+        best_id = -1
+        best_score = 0
+        for id in ids:
+            score = scores[id]
+            if score > best_score:
+                best_id = id
+                best_score = score
+
+        # Ensure precisely one id has the best match; if this is not the case,
+        # the match is ambiguous.
+        for id in ids:
+            score = scores[id]
+            if score == best_score and id != best_id:
+                if False: print ("  %s clash: %s and %s" % (fn, id, best_id))
+                best_id = "?"
+                break
+
+        # Store away what we have found.
+        status = "F" if best_id == "?" else "S"
+        if best_id == "?": best_id = "failure"
+        results += [[fn, cls, status, best_id]]
+
+    elapsed = timeit.default_timer () - start_time
+    return results, elapsed
+
+#-------------------------------------------------------------------------------
+# Feature vector matchers and their support routines.
+#-------------------------------------------------------------------------------
+
+def cityblock (v1, v2):
+    "Return the Manhatten distance between two vectors."
+    assert len (v1) == len (v2)
+    dd = 0
+    for i in range (0, len(v1)):
+        dd += abs (v1[i] - v2[i])
+    return dd
+
+def correlation (v1, v2):
+    "Return the correlation between two vectors."
+    assert len (v1) == len (v2)
+    sumx = sumy = sumxx = sumyy = sumxy = 0.0
+    n = len (v1)
+    for i in range (0, n):
+        i1 = v1[i]
+        i2 = v2[i]
+        sumx += i1
+        sumy += i2
+        sumxx += i1 * i1
+        sumxy += i1 * i2
+        sumyy += i2 * i2
+    i1 = sumxy - sumx * sumy / n
+    i2 = math.sqrt ((sumxx-sumx*sumx/n) * (sumyy-sumy*sumy/n))
+    return i1 / i2
+
+def corsim (v1, v2):
+    "Return the similarity between two vectors by correlation."
+    # Find the correlation.
+    r = correlation (v1, v2)
+    # Return a value that is non-negative and increasing.
+    return 1.0 - abs (r)
+
+def cosang (v1, v2):
+    """Calculate the cosine of the angle between two vectors and return how
+    much it differs from unity."""
+    val = dotprod (v1, v2) / veclen (v1) / veclen (v2)
+    return abs (val - 1.0)
+
+def dotprod (v1, v2):
+    "Return the scalar product of two vectors."
+    assert len (v1) == len (v2)
+    dd = 0
+    for i in range (0, len(v1)):
+        dd += v1[i] * v2[i]
+    return dd
+
+def pythag (v1, v2):
+    "Return the Euclidean distance between two vectors."
+    assert len (v1) == len (v2)
+    dd = 0
+    for i in range (0, len(v1)):
+        dd += (v1[i] - v2[i])**2
+    return math.sqrt (dd)
+
+def veclen (v):
+    "Return the length of a vector."
+    dd = 0
+    for i in v:
+        dd += i**2
+    return math.sqrt (dd)
+
+#-------------------------------------------------------------------------------
+# Routines for error reporting.
+#-------------------------------------------------------------------------------
+
+def error (msg, status=0):
+    "Print out an error message and optionally exit."
+    print (msg, file=sys.stderr)
+    if status != 0: sys.exit (status)
+
+def help (f=sys.stderr, status=0):
+    "Output some help and optionally exit."
+    print (__doc__, file=f)
+    if status != 0: sys.exit (status)
+
+def message (msg, f=sys.stderr):
+    "Print out an informative message."
+    print ("[" + msg + "]", file=sys.stderr)
+
+#-------------------------------------------------------------------------------
+# Task file loading, using code adapted from ELVS.
+#-------------------------------------------------------------------------------
+
+def parse_task_chunk (task, chunk, line, contin):
+    "Parse a line of a task definition."
+
+    # Strip off leading and trailing whitespace.
+    text = line.strip ()
+
+    # Different chunks are handled differently.
+    if chunk == "name" or chunk == "type" or chunk == "purpose":
+        # These fields contain text.
+        if contin:
+            task[chunk] += text
+        else:
+            task[chunk] = text
+
+    elif chunk == "class":
+        # We want a series of [class, colour] pairs.
+        words = text.split ()
+        if len (words) != 2:
+            error ("Problem with 'class' section of task file: '%s'" % text,
+                   status=5)
+        task[chunk] += [words]
+
+    elif chunk == "train":
+        # We want a series of [image, mask] or [image, label] pairs.
+        words = text.split ()
+        if len (words) != 2:
+            error ("Problem with 'train' section of task file: '%s'" % text,
+                   status=4)
+        task[chunk] += [words]
+
+    elif chunk == "test":
+        # As with "train", We want a series of [image, mask] or
+        # [image, label] pairs.
+        words = text.split ()
+        if len (words) != 2:
+            error ("Problem with 'test' section of task file: '%s'" % text,
+                   status=4)
+        task[chunk] += [words]
+
+    else:
+        error ("Unsupported task file chunk '%s'!" % chunk, status=3)
+
+def load_task (fn):
+    "Read and parse a task file, which may be a URL."
+    # We'll unpack the task into the following dictionary.
+    task = {
+        "name": "",
+        "type": "",
+        "purpose": "",
+        "class": [],
+        "train": [],
+        "test": [],
+    }
+
+    # If the "filename" is a URL, request it and store the lines in "content".
+    # To make the parsing easier, we also read all the lines of a file into
+    # the same variable.
+    if fn.startswith ("http://"):
+        import urllib.request
+        response = urllib.request.urlopen (fn)
+        lines = response.read().decode("utf-8").split ("\n")
+    else:
+        f = open (fn)
+        lines = f.readlines ()
+        f.close ()
+
+    # Process the individual lines.  The first line we encounter needs to be
+    # the start of a chunk, so make sure its name isn't set to help us catch
+    # erroneous input files.
+    chunk = None
+    for line in lines:
+        # Remove trailing whitespace and handle blank lines and comments.
+        line = line.rstrip ()
+        if len (line) <= 0: continue
+        if line[0] == "#": continue
+
+        # Determine whether it's the start of a chunk or a continuation.
+        if line[0] == " " or line[0] == "\t":
+            # It's a continuation.
+            if chunk is None:
+                error ("Task file '%s' doesn't start with a chunk name!" \
+                       % fn, status=1)
+            parse_task_chunk (task, chunk, line, True)
+        else:
+            # It's a new chunk.  Find the colon and handle the cases where it
+            # is missing or at the start of the line.
+            pos = line.find (":")
+            if pos < 0:
+                msg = "The following line should start a chunk but"
+                msg += " has no colon:\n   %s"
+                error (msg % line, status=2)
+            chunk = line[:pos].strip ()
+            if len (chunk) <= 0:
+                msg = "The following line should start a chunk but"
+                msg += " has no chunk name:\n   %s"
+                error (msg % line, status=3)
+
+            # Extract any remaining content from the line and assign it to the
+            # new chunk.
+            if pos+1 < len (line):
+                parse_task_chunk (task, chunk, line[pos+1:], False)
+
+    # Do a bit of sanity-checking.
+    if len (task["name"]) <= 0:
+        error ("Task contains no name!", status=10)
+    if len (task["name"]) <= 0:
+        error ("Task contains no purpose!", status=0)
+    if len (task["type"]) <= 0:
+        error ("Task contains no type!", status=10)
+    if task["type"] != "vision" and task["type"] != "label":
+        error ("Only 'vision' and 'label' tasks are supported!", status=11)
+    if len (task["train"]) <= 0:
+        error ("No training data provided for task!", status=12)
+    if len (task["test"]) <= 0:
+        message ("No testing data provided for task!")
+
+    # Return what we have loaded.
+    return task
+
+#-------------------------------------------------------------------------------
+# Other routines.
+#-------------------------------------------------------------------------------
+
+def classes_from_filenames (fns):
+    "Extract the class names from `fns`."
+    classnames = []
+    for fn in fns:
+        # We want the filename to start with "<class>-".  We pull the actual
+        # filename from any directory name that happens to be present before
+        # trying to find this pattern.
+        fn = os.path.split (fn)[1]
+        match = re.search ("^([^-]+)-", fn)
+        if match:
+            id = match.groups()[0]
+        else:
+            id = fn
+        classnames += [id]
+    return classnames
+
+def load_image (fn):
+    "Load and return the image in `fn`, possibly from a data directory."
+    global DATADIR
+
+    for d in DATADIR:
+        ffn = os.path.join (d, fn)
+        if os.path.exists (ffn):
+            im = eve.image (ffn)
+            return im
+    error ("Cannot find image file '%s'!" % fn, status=10)
+
+def output_transcript (name, results, time, task_type="label"):
+    "Output a FACT-compatible transcript."
+
+    # Start the transcript file.  We include the date and time in the header
+    # and time how long it takes to run all the tests, reported at the end.
+    version = "0.00"
+    now = datetime.datetime.now()
+    print ("transcript_begin %s %s %s %s" % (name, version, task_type, now))
+
+    for fn, truth, status, cls in results:
+        print ("result %s %s %s %s" % (fn, truth, status, cls))
+    print ("transcript_end %.2f" % time)
+
+#-------------------------------------------------------------------------------
+# Main program.
+#-------------------------------------------------------------------------------
+
+# Set up the names of the feature vector matchers.
+MATCHERS = {
+    "pythag": pythag,
+    "manhatten": cityblock,
+    "correlation": corsim,
+    "angle": cosang,
+}
+
+# Set up the names of the learners.
+LEARNERS = ["none", "cnn", "eigen", "mlp", "rf", "svm", "wisard"]
+
+# Set up the parsing of the command line.
+parser = argparse.ArgumentParser (description=__doc__)
+
+# First, generic qualifiers.
+parser.add_argument ("-data", default=".",
+                     help="directory in which to look for images")
+parser.add_argument ("-eigen", type=int, default=0,
+              help="if non-zero, maximum number of eigen coefficients to retain")
+parser.add_argument ("-learner", choices=LEARNERS, default=LEARNERS[0],
+                     help="the machine learning algorithm to use")
+parser.add_argument ("-seed", type=int, default=0,
+                     help="the seed of the random number generator")
+parser.add_argument ("-sleep", type=int, default=10,
+              help="time to sleep before overwriting a knowledge base")
+parser.add_argument ("-name", default="whatever",
+                     help="name of task being performed")
+parser.add_argument ("-v", action="store_true", default=False,
+                     help="output stuff while running")
+parser.add_argument ("-version", action="store_true", default=False,
+                     help="output the version of the program")
+
+# Qualifiers for Eigen.
+parser.add_argument ("-match", default="pythag",
+                     choices=MATCHERS,
+                     help="feature matching criterion for eigen")
+
+# Qualifiers for MLP.
+parser.add_argument ("-epochs", type=int, default=100,
+                     help="number of epochs for training a MLP")
+parser.add_argument ("-alpha", type=float, default=1.0e-4,
+                     help="alpha parameter when training a MLP")
+parser.add_argument ("-rate", type=float, default=0.1,
+                     help="learning rate parameter when training a MLP")
+parser.add_argument ("-tol", type=float, default=1.0e-4,
+                     help="tol parameter when training a MLP")
+
+# Qualifiers for RF.
+parser.add_argument ("-estimators", type=int, 
+                     help="number of estimators for training a RF")
+
+# Qualifiers for SVM.  The default parameter settings are from
+# http://www.trungh.com/2013/04/digit-recognition-using-svm-in-python/
+parser.add_argument ("-C", type=float, default=2.8,
+                     help="SVM learning parameter C")
+parser.add_argument ("-gamma", type=float, default=0.0073,
+                     help="SVM learning parameter gamma")
+
+# Qualifiers for WISARD.
+parser.add_argument ("-nlocs", type=int, default=10,
+                     help="number of WISARD locations to sample per tuple")
+parser.add_argument ("-ntuples", type=int, default=20,
+                     help="number of WISARD tuples")
+parser.add_argument ("-threshold", type=int, default=127,
+                     help="binarization threshold for WISARD")
+
+# Parameters, the same for every learner.
+parser.add_argument ("op", choices=("train", "test"),
+                     help="the operation to be performed")
+parser.add_argument ("kbase",
+                     help="the 'knowledge base' to be saved or read in")
+parser.add_argument ("file", nargs="+", default="",
+                     help="the file to be processed")
+
+# Do the parsing.
+args = parser.parse_args()
+
+# Pull the learner, operation etc from the parsed command line.
+learner = args.learner
+op = args.op
+loud = args.v
+DATADIR = [args.data]
+
+# If the user wanted the version, output it.
+if args.version:
+    print (timestamp[13:32])
+
+# If necessary, set the random number generator's seed.
+if args.seed == 0:
+    seed = random.randint (0, sys.maxsize)
+    if loud: message ("using seed %d" % args.seed)
+random.seed (args.seed)
+
+# If we were invoked with a single command-line argument and it ends in ".task",
+# we assume it is a ELVS-compatible task file and load that.   Otherwise, it
+# should a (list of) image files to be used for training or testing.
+if not isinstance (args.file, list): args.file = [args.file]
+
+if len (args.file) == 1 and args.file[0].endswith (".task"):
+    task = load_task (args.file[0])
+    args.name = task["name"]
+    files = []
+    classes = []
+    # Pull the filenames and corresponding classes into the form we shall use
+    # in this program.
+    for f, c in task[op]:
+        files += [f]
+        classes += [c]
+
+else:
+    # It's a list of filenames, in which case the filename should give the
+    # associated class.  We need to pull them from the filenames.
+    files = args.file
+    classes = classes_from_filenames (files)
+
+# Branch according to the operation to be performed.
+if op == "train":
+    # Give a warning if the training file exists, pause, then overwrite it.
+    if os.path.exists (args.kbase):
+        error ("Warning: overwriting knowledge base '%s'." % args.kbase)
+        time.sleep (args.sleep)
+
+    # Branch according to the learning algorithm to be used.
+    if learner == "cnn":
+        if "tensorflow" not in sys.modules:
+            error ("You need Tensorflow enabled to use a CNN!", status=15)
+        kbase = train_cnn (files, classes, args.epochs, loud)
+    elif learner == "eigen":
+        kbase = train_eigen (files, classes, args.eigen, loud)
+    elif learner == "mlp":
+        kbase = train_mlp (files, classes, args.epochs, args.alpha, args.tol,
+                           args.rate, loud)
+    elif learner == "rf":
+        # If the number of estimators wasn't set, calculate it from the number of
+        # filenames to be processed.
+        if args.estimators is None:
+            args.estimators = int (math.sqrt (len (files))) + 1
+            message ("Using %d estimators" % args.estimators)
+        kbase = train_rf (files, classes, args.estimators, loud)
+    elif learner == "svm":
+        kbase = train_svm (files, classes, args.C, args.gamma, loud)
+    elif learner == "wisard":
+        kbase = train_wisard (files, classes, args.nlocs, args.ntuples,
+                              args.threshold, loud)
+    else:
+        error ("You need to choose a learning algorithm using '-L'.", status=1)
+
+    # Store away the trained 'knowledge base' into the specified file.
+    with open (args.kbase, "wb") as f:
+        pickle.dump ((args.name, learner, kbase), f)
+    if loud:
+        message ("Knowledge base saved to '%s'" % args.kbase)
+
+elif op == "test":
+    # Load our knowledge from the specified file.
+    with open (args.kbase, "rb") as f:
+        name, learner, kbase = pickle.load (f)
+    if loud:
+        message ("Knowledge base %s trained using '%s' read from '%s'" \
+                 % (name, learner, args.kbase))
+
+    # Branch according to the learning algorithm that was used.
+    if learner == "cnn":
+        if "tensorflow" not in sys.modules:
+            error ("You need Tensorflow enabled to use a CNN!", status=15)
+        results, time = test_cnn (kbase, files, classes, loud)
+    elif learner == "eigen":
+        results, time = test_eigen (kbase, files, classes,
+                            MATCHERS[args.match], args.eigen, loud)
+    elif learner in ["mlp", "rf", "svm"]:
+        results, time = test_sklearn (kbase, files, classes, loud)
+    elif learner == "wisard":
+        results, time = test_wisard (kbase, files, classes, loud)
+    else:
+        error ("I don't know about the learner called '%s'!" % learner, status=2)
+
+    # Output the test results as a FACT-compatible transcript.
+    output_transcript (name, results, time)
+
+else:
+    error ("Unrecognized operation '" + op + "'. (This cannot happen!)")
+
+# Local Variables:
+# time-stamp-line-limit: 100
+# End:
+#-------------------------------------------------------------------------------
+# End of ml.
+#-------------------------------------------------------------------------------
