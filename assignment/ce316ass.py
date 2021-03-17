@@ -135,16 +135,41 @@ Given the sample data, this program produces an output of:
 I was expecting Cyan to be a UFO. However, I wasn't really expecting the others
 to be UFOs.
 
-Changing the 'maxSus' value in the 'isThisAStraightLine' function to require
-10% of the found dots to be not close to 1 (instead of 5%) before identifying an
-object as a UFO returned this result instead:
-    UFO: cyan blue orange
+This is using a 'straightLineMaxUncertainty' global variable, which is defined
+just above the 'isThisAStraightLine' function. Basically, if that proportion of
+unit vector versions of the movement of the object between the frames are not
+close enough to the unit vector of the start position to end position movement
+(worked out 'if the dot of current movement and total movement = 1', because yay
+dot product abuse), we can't confidently say it's a straight line, therefore,
+we'll assume it's an asteroid.
 
-Again, I still wasn't expecting blue or orange to be a UFO. Then again, I find
-it nigh impossible to see stuff in stereo on a computer screen, so I genuinely
-don't know if the others are actually moving in a straight line or not.
+straightLineMaxUncertainty must be between 0.0 and 1.0 (inclusive). If there
+are very few current movements, the minimum 'sus' threshold will be 1.
 
-However, we need to consider the context of the problem.
+Here's some outputs of the program with different 'straightLineMaxUncertainty'
+values (specifically, the lowest values where I noticed a change in the number
+of UFOs that were output).
+
+    * 0
+        * UFO: cyan red white blue yellow orange
+    * 0.05
+        * UFO: cyan white blue yellow orange
+    * 0.0625
+        * UFO: cyan blue yellow orange
+    * 0.075
+        * UFO: cyan blue orange
+    * 0.11
+        * UFO: cyan blue
+    * 0.125
+        * UFO: cyan
+    * 0.35
+        * UFO:
+
+Green was never detected as a UFO.
+
+Then there was the problem of what threshold to use.
+
+So we need to consider the context of the problem.
 
 The problem is 'which of these things are aliens trying to attack earth and nick
 our PDMS'. Which, to me, sounds like the sort of program where false negatives
@@ -165,6 +190,8 @@ However, seeing as not all of the objects are listed as 'UFOs' when using this
 threshold, I'm confident that I'm not getting *too* many false positives, so I'm
 considering it to be good enough.
 
+
+---
 It runs pretty quickly though which is nice I guess.
 
 """
@@ -393,6 +420,156 @@ def handleShowingStuff() -> None:
 
 Yep. Everything from here is actually of some use.
 """
+
+"""
+~~~~~~ A VECTOR3D CLASS (and also a function that uses it) ~~~~~~
+
+This is used later on, represents points in 3D space
+"""
+
+
+class Vector3D:
+    """
+    A class to represent a vector in 3D space.
+    This code was written by myself, but I fully acknowledge that somebody else
+    has probably written a python implementation of a 3D vector before, so any
+    relationship between this Vector3D and another implementation of Vector3D
+    is entirely coincidental.
+
+    This implementation just contains a normalize, subtract, isZero, dot product
+    , and __str__ method (as well as a constructor ofc), because that's all
+    the math stuff I needed for this particular use case.
+
+    References for particular sources for math stuff (when used) have been given
+    in the methods for each of the functions that use the math stuff.
+
+    Now, you may ask yourself 'why is a class being used, when a tuple could
+    do the same thing?'. Simple answer; encapsulation (so I have the methods all
+    in the same place as each other). And also making sure I don't get confused
+    between tuples of floats and 3D vectors. The mutability is also nice for the
+    subtraction and the normalization stuff.
+    """
+    def __init__(self, x: float, y: float, z: float):
+        """
+        Constructs a Vector3D with the given x, y, and z coordinates
+        :param x: x coordinate
+        :param y: y coordinate
+        :param z: z coordinate
+        """
+        self.x: float = x
+        self.y: float = y
+        self.z: float = z
+
+    def magnitude(self) -> float:
+        """
+        dist between 2 3D points:
+        sqrt(((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
+        and we know that x1,y1,z1 = 0 already (because vector comes from origin
+        0) and x2, y2, and z2 are the x, y, and z of this vector.
+
+        Got the maths from https://www.calculator.net/distance-calculator.html
+
+        :return: the magnitude of this vector
+        """
+        return sqrt((self.x ** 2) + (self.y ** 2) + (self.z ** 2))
+
+    def normalized(self) -> "Vector3D":
+        """
+        Normalizes this Vector3D (makes the magnitude 1 by dividing all the
+         components of this Vector3D by its magnitude)
+
+        :return: This Vector3D, but with a magnitude of 1 instead.
+         if this already had a magnitude of 0, it'll return itself as-is.
+        """
+        mag: float = self.magnitude()
+        if mag > 0:
+            self.x = self.x / mag
+            self.y = self.y / mag
+            self.z = self.z / mag
+
+        return self
+
+    def subtract(self, other: "Vector3D") -> "Vector3D":
+        """
+        Subtracts the other Vector3D from this Vector3D, returning this
+        modified Vector3D.
+
+        Didn't need to get the maths from anywhere because subtraction is pretty
+        darn simple and doesn't have any weirdness.
+
+        :param other: the other Vector3D to subtract from this.
+        :return: this Vector3D minus 'other'. Would have type-annotated the
+         return type as Vector3D, but python didn't like that.
+        """
+        self.x -= other.x
+        self.y -= other.y
+        self.z -= other.z
+        return self
+
+    def dot(self, other: "Vector3D") -> float:
+        """
+        Returns the dot product of this Vector3D and the other Vector3D.
+
+        Got the maths from https://www.quantumstudy.com/physics/vectors-2/
+
+        :param other: the other Vector3D this is being dot product-ed against.
+        :return: the dot product of this and the other vector3D
+        """
+        return (self.x * other.x) + (self.y * other.y) + (self.z * other.z)
+
+    # noinspection PyPep8Naming
+    def isZero(self) -> bool:
+        """
+        Check if this vector is (0,0,0)
+        :return: Returns true if x, y and z are exactly equal to 0
+        """
+        return (self.x == 0) and (self.y == 0) and (self.z == 0)
+
+    def __str__(self) -> str:
+        """
+        Outputs this as a string; as a tuple in the form (x, y, z)
+        :return: a string of the tuple (self.x, self.y, self.z)
+
+        """
+        return str((self.x, self.y, self.z))
+
+
+# noinspection PyPep8Naming
+def normalizeVectorBetweenPoints(fromVec: Vector3D, toVec: Vector3D) ->\
+        Vector3D:
+    """
+    Get lhs-rhs but normalized instead (leaving lhs and rhs untouched)
+
+    >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(1,1,1))
+    (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
+
+    >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(2,2,2))
+    (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
+
+    >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(1,1.5,2))
+    (0.3713906763541037, 0.5570860145311556, 0.7427813527082074)
+
+    >>> normalizeVectorBetweenPoints(Vector3D(1,1,1),Vector3D(1,1,1))
+    (0, 0, 0)
+
+    :param fromVec: going from this vector
+    :param toVec: to this other vector
+    :return: toVec - fromVec but normalized. Or in other words, the direction of
+     movement from the position 'fromVec' to the position 'toVec'
+    """
+    return Vector3D(toVec.x, toVec.y, toVec.z)\
+        .subtract(fromVec)\
+        .normalized()
+
+
+"""
+~~~~~ READING IMAGES, FINDING OBJECTS, AND ALSO CALCULATING AND
+ PRINTING THE POSITIONS OF SAID OBJECTS ~~~~~
+
+These functions (and also globals) are responsible for finding and printing the
+positions of the objects in 3D space.
+"""
+
 
 # HSV values to be used to extract the objects from the image.
 min_cyan: Tuple[int, int, int] = (90, 0, 0)
@@ -663,140 +840,6 @@ def getStereoPositions(left_in: np.ndarray, right_in: np.ndarray) -> \
     return posDict
 
 
-class Vector3D:
-    """
-    A class to represent a vector in 3D space.
-    This code was written by myself, but I fully acknowledge that somebody else
-    has probably written a python implementation of a 3D vector before, so any
-    relationship between this Vector3D and another implementation of Vector3D
-    is entirely coincidental.
-
-    This implementation just contains a normalize, subtract, isZero, dot product
-    , and __str__ method (as well as a constructor ofc), because that's all
-    the math stuff I needed for this particular use case.
-
-    References for particular sources for math stuff (when used) have been given
-    in the methods for each of the functions that use the math stuff.
-
-    Now, you may ask yourself 'why is a class being used, when a tuple could
-    do the same thing?'. Simple answer; encapsulation (so I have the methods all
-    in the same place as each other). And also making sure I don't get confused
-    between tuples of floats and 3D vectors. The mutability is also nice for the
-    subtraction and the normalization stuff.
-    """
-    def __init__(self, x: float, y: float, z: float):
-        """
-        Constructs a Vector3D with the given x, y, and z coordinates
-        :param x: x coordinate
-        :param y: y coordinate
-        :param z: z coordinate
-        """
-        self.x: float = x
-        self.y: float = y
-        self.z: float = z
-
-    def magnitude(self) -> float:
-        """
-        dist between 2 3D points:
-        sqrt(((x2-x1)^2) + ((y2-y1)^2) + ((z2 - z1)^2))
-        and we know that x1,y1,z1 = 0 already (because vector comes from origin
-        0) and x2, y2, and z2 are the x, y, and z of this vector.
-
-        Got the maths from https://www.calculator.net/distance-calculator.html
-
-        :return: the magnitude of this vector
-        """
-        return sqrt((self.x ** 2) + (self.y ** 2) + (self.z ** 2))
-
-    def normalized(self) -> "Vector3D":
-        """
-        Normalizes this Vector3D (makes the magnitude 1 by dividing all the
-         components of this Vector3D by its magnitude)
-
-        :return: This Vector3D, but with a magnitude of 1 instead.
-         if this already had a magnitude of 0, it'll return itself as-is.
-        """
-        mag: float = self.magnitude()
-        if mag > 0:
-            self.x = self.x / mag
-            self.y = self.y / mag
-            self.z = self.z / mag
-
-        return self
-
-    def subtract(self, other: "Vector3D") -> "Vector3D":
-        """
-        Subtracts the other Vector3D from this Vector3D, returning this
-        modified Vector3D.
-
-        Didn't need to get the maths from anywhere because subtraction is pretty
-        darn simple and doesn't have any weirdness.
-
-        :param other: the other Vector3D to subtract from this.
-        :return: this Vector3D minus 'other'. Would have type-annotated the
-         return type as Vector3D, but python didn't like that.
-        """
-        self.x -= other.x
-        self.y -= other.y
-        self.z -= other.z
-        return self
-
-    def dot(self, other: "Vector3D") -> float:
-        """
-        Returns the dot product of this Vector3D and the other Vector3D.
-
-        Got the maths from https://www.quantumstudy.com/physics/vectors-2/
-
-        :param other: the other Vector3D this is being dot product-ed against.
-        :return: the dot product of this and the other vector3D
-        """
-        return (self.x * other.x) + (self.y * other.y) + (self.z * other.z)
-
-    # noinspection PyPep8Naming
-    def isZero(self) -> bool:
-        """
-        Check if this vector is (0,0,0)
-        :return: Returns true if x, y and z are exactly equal to 0
-        """
-        return (self.x == 0) and (self.y == 0) and (self.z == 0)
-
-    def __str__(self) -> str:
-        """
-        Outputs this as a string; as a tuple in the form (x, y, z)
-        :return: a string of the tuple (self.x, self.y, self.z)
-
-        """
-        return str((self.x, self.y, self.z))
-
-
-# noinspection PyPep8Naming
-def normalizeVectorBetweenPoints(fromVec: Vector3D, toVec: Vector3D) ->\
-        Vector3D:
-    """
-    Get lhs-rhs but normalized instead (leaving lhs and rhs untouched)
-
-    >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(1,1,1))
-    (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
-
-    >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(2,2,2))
-    (0.5773502691896258, 0.5773502691896258, 0.5773502691896258)
-
-    >>> normalizeVectorBetweenPoints(Vector3D(0,0,0),Vector3D(1,1.5,2))
-    (0.3713906763541037, 0.5570860145311556, 0.7427813527082074)
-
-    >>> normalizeVectorBetweenPoints(Vector3D(1,1,1),Vector3D(1,1,1))
-    (0, 0, 0)
-
-    :param fromVec: going from this vector
-    :param toVec: to this other vector
-    :return: toVec - fromVec but normalized. Or in other words, the direction of
-     movement from the position 'fromVec' to the position 'toVec'
-    """
-    return Vector3D(toVec.x, toVec.y, toVec.z)\
-        .subtract(fromVec)\
-        .normalized()
-
-
 placeholderOutString: str = "{:5}  {:8}  {:8.2e}  {}"
 """
 This is a placeholder string to be used when formatting the frame-by-frame
@@ -924,11 +967,47 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
     return posXYZ
 
 
+"""
+~~~~~~ WORKING OUT WHAT IS/IS NOT A UFO ~~~~~~
+
+These methods (and globals) are used to work out what is/isn't a UFO from a
+dictionary of UFO identifiers and their frame-by-frame positions as lists of
+Vector3D objects.
+"""
+
 debuggingLineStuff: bool = False
 """
 Set this to true if you want to enable the debug printouts for the 
 isThisAStraightLine function (immediately below this)
 """
+
+straightLineMaxUncertainty: float = 0.05
+"""
+How uncertain we are allowing ourselves to be about whether a line is straight
+or not. If there is more than this amount of uncertainty (0.05 = 5%), we won't
+consider it to be a straight line; instead, we'll consider it to be a UFO.
+
+MUST BE BETWEEN 0 AND 1.0!
+
+Outputs at different thresholds of this value:
+    * 0
+        * UFO: cyan red white blue yellow orange
+    * 0.05
+        * UFO: cyan white blue yellow orange
+    * 0.0625
+        * UFO: cyan blue yellow orange
+    * 0.075
+        * UFO: cyan blue orange
+    * 0.11
+        * UFO: cyan blue
+    * 0.125
+        * UFO: cyan
+    * 0.35
+        * UFO: 
+    
+"""
+
+assert (0.0 <= straightLineMaxUncertainty <= 1.0)
 
 
 # noinspection PyPep8Naming
@@ -1036,7 +1115,9 @@ def isThisAStraightLine(line: List[Vector3D]) -> bool:
         # so it'll return True.
         return True
 
-    maxSus: int = len(dots)//20
+    maxSusFloat: float = len(dots) * straightLineMaxUncertainty
+
+    maxSus: int = int(maxSusFloat)
     """
     This is how many of the dot products have to be not roughly equal to 1 for
     the object to be labelled as a UFO. It's currently set up so, if ~5% of the
@@ -1055,6 +1136,10 @@ def isThisAStraightLine(line: List[Vector3D]) -> bool:
     is travelling in a straight line', and accept the null hypothesis (of 'this
     object is not travelling in a straight line') instead.
     """
+
+    # and if there's a maximum sus level that's below 0, we set it to 1.
+    if maxSus < 1:
+        maxSus = 1
 
     if debuggingLineStuff:
         print("ufo is " + str(maxSus) + " sus!")  # WHEN THE UFO IS SUS!
@@ -1083,7 +1168,7 @@ def isThisAStraightLine(line: List[Vector3D]) -> bool:
             if debuggingLineStuff:
                 print("diff " + str(debugCount) + " is " +
                       str(susCount) + " sus")
-            if susCount == maxSus:  # WHEN THE UFO IS SUS
+            if susCount >= maxSus:  # WHEN THE UFO IS SUS
                 return False  # amogus
         debugCount += 1
 
@@ -1101,7 +1186,7 @@ def makeUfoString(objPositions: Dict[str, List[Vector3D]]) -> str:
      positions for all the objects that may or may not be UFOs
     :return: string with the identifiers of what is and isn't a UFO
     """
-    ufoString: str = "UFO:"
+    ufoString: str = ""
     """
     The space-delimited string of UFO identifiers.
     """
@@ -1113,8 +1198,14 @@ def makeUfoString(objPositions: Dict[str, List[Vector3D]]) -> str:
             # it's appended to the ufoString.
             ufoString = ufoString + " " + key
 
-    print(ufoString)
     return ufoString
+
+
+"""
+~~~~~~ CHECKING WHETHER OR NOT AN IMAGE OPENED ~~~~~
+
+yeah this is just here to stop a big error from happening
+"""
 
 
 # noinspection PyPep8Naming
@@ -1160,7 +1251,7 @@ def checkIfImageWasOpened(filename: str, img: Union[np.ndarray, None]) -> None:
 
 
 """
--- THE MAIN PROGRAM --
+~~~~~~ THE MAIN PROGRAM ~~~~~~
 
 Everything from here is the stuff that runs when you start running this.
 """
@@ -1239,7 +1330,7 @@ for frame in range(0, nframes):
         # and we append them to the list of all positions for that object.
 
 # Finally, we print out what is/isn't a UFO.
-makeUfoString(objectPositions)
+print("UFO:{}".format(makeUfoString(objectPositions)))
 
 """
 That's all, folks!
