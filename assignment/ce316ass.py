@@ -196,6 +196,8 @@ considering it to be good enough.
 ---
 It runs pretty quickly though which is nice I guess.
 
+6 seconds on the lab VMs!
+
 """
 
 
