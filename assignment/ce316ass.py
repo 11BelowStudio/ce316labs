@@ -58,6 +58,8 @@ This will:
               is likely to be *very* inaccurate (because the object is likely to
               have been cut off somewhat), so, instead of dealing with that
               headache, it's just ignored.
+        * If the x midpoint of an object in both images is identical, that
+          object will be ignored because python doesn't like dividing by 0.
 * For each of the objects identified in every frame
     * Print their distance (in terms of Z depth) from the cameras, in metres.
         * Along with their full X, Y, Z position from the cameras
@@ -176,8 +178,8 @@ our PDMS'. Which, to me, sounds like the sort of program where false negatives
 are more dangerous than false positives.
 
 Therefore, to minimize the chance of false positives, and also to satisfy the
-self-declared stats person inside me, I am going to stick with the 5% 'not close
-to 1' threshold thing for the dot products.
+self-declared stats person inside me, I am going to stick with the 95% 'is not
+UFO' confidence-y threshold thing.
 
 So basically, when you see 'UFO' on the printout, read '>5% not an asteroid'.
 Because if I'm not 95% confident of it being an asteroid (by having more than 5%
@@ -920,6 +922,11 @@ def calculateAndPrintPositionsOfObjects(leftIm: np.ndarray,
 
         xDisparity: float = currentPos[0][0] - currentPos[1][0]
         "x disparity = xL - xR"
+
+        if xDisparity == 0.0:
+            # undefined behaviour (aka runtime error) if the x disparity is 0.
+            # so we'll just forget it ever happened
+            continue
 
         rawZ: float = (focalLength * baseline) / (xDisparity * pixelSize)
         """
